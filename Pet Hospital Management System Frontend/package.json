@@ -1,0 +1,35 @@
+{
+  "name": "phms-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "test:auth": "playwright test e2e/tests/auth.spec.ts",
+    "test:user": "playwright test e2e/tests/user/",
+    "test:doctor": "playwright test e2e/tests/doctor/",
+    "test:admin": "playwright test e2e/tests/admin/"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "axios": "^1.7.7",
+    "echarts": "^5.5.0",
+    "element-plus": "^2.13.0",
+    "vue": "^3.5.11",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^25.0.3",
+    "@vitejs/plugin-vue": "^5.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.10"
+  }
+}

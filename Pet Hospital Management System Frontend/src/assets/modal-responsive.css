@@ -1,0 +1,114 @@
+/* 弹窗移动端适配增强样式 */
+
+/* 大模态框移动端优化 */
+@media (max-width: 767px) {
+  /* 大模态框（如角色分配、用户列表等） */
+  .large-modal,
+  .modal.large {
+    min-width: 100% !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  /* 表单在移动端的优化 */
+  .modal-body .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .modal-body .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+    width: 100%;
+    text-align: left;
+  }
+  
+  .modal-body .form-group input,
+  .modal-body .form-group select,
+  .modal-body .form-group textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  
+  .modal-body .form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+  
+  /* 多列表单布局在移动端垂直排列 */
+  .modal-body .form-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .modal-body .form-row .form-group {
+    width: 100%;
+    margin-bottom: 0;
+  }
+  
+  /* 复选框和单选框组在移动端优化 */
+  .modal-body .checkbox-group,
+  .modal-body .radio-group {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .modal-body .checkbox-group label,
+  .modal-body .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0;
+  }
+  
+  /* 表格在模态框中的移动端优化 */
+  .modal-body .data-table {
+    font-size: 12px;
+  }
+  
+  .modal-body .data-table th,
+  .modal-body .data-table td {
+    padding: 8px 5px;
+  }
+  
+  /* 按钮组在模态框中的移动端优化 */
+  .modal-footer .btn-group {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+  
+  .modal-footer .btn-group button {
+    width: 100%;
+    margin: 0;
+  }
+  
+  /* 角色分配等复杂表单的移动端优化 */
+  .modal-body .user-list,
+  .modal-body .role-list {
+    max-height: 300px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 搜索框在模态框中的优化 */
+  .modal-body .search-input {
+    width: 100%;
+    margin-bottom: 15px;
+  }
+  
+  /* 标签页在移动端的优化 */
+  .modal-body .tabs {
+    flex-direction: column;
+  }
+  
+  .modal-body .tab-content {
+    margin-top: 15px;
+  }
+}
+
