@@ -35,17 +35,32 @@ class WebSocketManager {
     this.userId = userId;
     this.isManualClose = false;
 
-    // 构建WebSocket URL - 通过Vite代理连接到后端服务器
-    // Vite会自动将 /ws 路径代理到后端服务器
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    this.url = `${wsProtocol}//${host}/ws/notification?userId=${userId}`;
+    // 构建WebSocket URL
+    // 在开发环境下，直接连接到后端服务器（避免Vite代理问题）
+    // 在生产环境下，使用相对路径通过代理连接
+    const isDevelopment = import.meta.env.DEV;
+    let wsProtocol: string;
+    let host: string;
+    
+    if (isDevelopment) {
+      // 开发环境：直接连接到后端服务器
+      wsProtocol = 'ws:';
+      host = 'localhost:8186'; // 后端服务器地址
+      this.url = `${wsProtocol}//${host}/ws/notification?userId=${userId}`;
+    } else {
+      // 生产环境：使用相对路径（通过反向代理）
+      wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      host = window.location.host;
+      this.url = `${wsProtocol}//${host}/ws/notification?userId=${userId}`;
+    }
+    
+    console.log('尝试连接WebSocket:', this.url, '开发模式:', isDevelopment);
 
     try {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('WebSocket连接成功');
+        console.log('WebSocket连接成功，URL:', this.url);
         this.reconnectAttempts = 0;
         if (onMessage) {
           this.addMessageHandler(onMessage);
@@ -55,27 +70,44 @@ class WebSocketManager {
       this.ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          console.log('收到WebSocket消息:', message);
           this.handleMessage(message);
         } catch (e) {
-          console.error('解析WebSocket消息失败:', e);
+          console.error('解析WebSocket消息失败:', e, '原始数据:', event.data);
         }
       };
 
       this.ws.onerror = (error) => {
         console.error('WebSocket错误:', error);
+        console.error('WebSocket连接URL:', this.url);
+        console.error('WebSocket状态:', this.ws?.readyState);
+        // 尝试获取更多错误信息
+        if (this.ws) {
+          console.error('WebSocket readyState:', this.ws.readyState);
+          console.error('WebSocket protocol:', this.ws.protocol);
+          console.error('WebSocket extensions:', this.ws.extensions);
+        }
       };
 
-      this.ws.onclose = () => {
-        console.log('WebSocket连接关闭');
+      this.ws.onclose = (event) => {
+        console.log('WebSocket连接关闭', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+          url: this.url
+        });
         this.ws = null;
 
         // 如果不是手动关闭，尝试重连
         if (!this.isManualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.scheduleReconnect();
+        } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          console.error('WebSocket重连次数已达上限，停止重连');
         }
       };
     } catch (error) {
       console.error('WebSocket连接失败:', error);
+      console.error('连接URL:', this.url);
       this.scheduleReconnect();
     }
   }

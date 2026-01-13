@@ -1,18 +1,20 @@
 package com.phms.config;
 
+import com.phms.filter.JwtFilter;
 import com.phms.shiro.CustomRealm;
 import com.phms.shiro.CustomRolesAuthorizationFilter;
 import org.apache.shiro.cache.MemoryConstrainedCacheManager;
+import org.apache.shiro.mgt.DefaultSessionStorageEvaluator;
+import org.apache.shiro.mgt.DefaultSubjectDAO;
 import org.apache.shiro.mgt.SecurityManager;
-import org.apache.shiro.session.mgt.SessionManager;
-import org.apache.shiro.session.mgt.eis.MemorySessionDAO;
 import org.apache.shiro.spring.LifecycleBeanPostProcessor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
-import org.apache.shiro.web.session.mgt.DefaultWebSessionManager;
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import javax.servlet.Filter;
 import java.util.LinkedHashMap;
@@ -23,6 +25,10 @@ import java.util.Map;
  */
 @Configuration
 public class ShiroConfig {
+	
+	@Autowired
+	@Lazy
+	private JwtFilter jwtFilter;
 
 	@Bean
 	public static LifecycleBeanPostProcessor getLifecycleBeanPostProcessor() {
@@ -73,6 +79,7 @@ public class ShiroConfig {
 		// 自定义拦截器
 		Map<String, Filter> filtersMap = new LinkedHashMap<>();
 		filtersMap.put("roleOrFilter", new CustomRolesAuthorizationFilter());
+		filtersMap.put("jwt", jwtFilter);
 		shiroFilterFactoryBean.setFilters(filtersMap);
 
 		// 必须设置 SecurityManager
@@ -97,24 +104,30 @@ public class ShiroConfig {
 		//filterChainDefinitionMap.put("/sa/**", "roles[超级管理员]");
 		//filterChainDefinitionMap.put("/jz/**", "roleOrFilter[家长|教师|超级管理员]");
 		//filterChainDefinitionMap.put("/ls/**", "roleOrFilter[教师|超级管理员]");
-		// 开放登陆接口
+		// 开放登录相关接口（不需要JWT认证）
 		filterChainDefinitionMap.put("/login", "anon");
+		filterChainDefinitionMap.put("/captcha", "anon");
+		filterChainDefinitionMap.put("/sendEmailCode", "anon");
+		filterChainDefinitionMap.put("/doRegist", "anon");
+		filterChainDefinitionMap.put("/resetPassword", "anon");
+		filterChainDefinitionMap.put("/sendResetPasswordCode", "anon");
 		filterChainDefinitionMap.put("/index", "anon");
 		filterChainDefinitionMap.put("/home", "anon");
 		filterChainDefinitionMap.put("/open/**", "anon");
 		filterChainDefinitionMap.put("/upload/**", "anon");
 		filterChainDefinitionMap.put("/file/**", "anon");
 		filterChainDefinitionMap.put("/regist", "anon");
-		filterChainDefinitionMap.put("/doRegist", "anon");
+		// WebSocket连接路径（WebSocket握手是HTTP请求，需要排除）
+		filterChainDefinitionMap.put("/ws/**", "anon");
 		// 静态资源设置为可访问
 		filterChainDefinitionMap.put("/css/**", "anon");
 		filterChainDefinitionMap.put("/imgs/**", "anon");
 		filterChainDefinitionMap.put("/js/**", "anon");
 		filterChainDefinitionMap.put("/plug/**", "anon");
 		filterChainDefinitionMap.put("/samples/**", "anon");
-		// 其余接口一律拦截
+		// 其余接口一律使用JWT过滤器
 		// 主要这行代码必须放在所有权限设置的最后，不然会导致所有 url 都被拦截
-		filterChainDefinitionMap.put("/**", "anon");
+		filterChainDefinitionMap.put("/**", "jwt");
 
 		shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
 		return shiroFilterFactoryBean;
@@ -123,7 +136,7 @@ public class ShiroConfig {
 	/**
 	 * Method name: securityManager <BR>
 	 * Description: 注入 securityManager <BR>
-	 * Remark: <BR>
+	 * Remark: 禁用Session，使用JWT无状态认证 <BR>
 	 * 
 	 * @param customRealm
 	 * @return SecurityManager<BR>
@@ -131,27 +144,19 @@ public class ShiroConfig {
 	@Bean
 	public DefaultWebSecurityManager securityManager(CustomRealm customRealm) {
 		DefaultWebSecurityManager securityManager = new DefaultWebSecurityManager();
-		// 设置realm.
+		// 设置realm
 		securityManager.setRealm(customRealm);
-		// 控制多个浏览器只能登陆一个用户
-		securityManager.setSessionManager(sessionManager());
-		// 控制多个浏览器只能登陆一个用户
+		
+		// 禁用Session存储：配置SubjectDAO不使用Session存储
+		DefaultSubjectDAO subjectDAO = new DefaultSubjectDAO();
+		DefaultSessionStorageEvaluator sessionStorageEvaluator = new DefaultSessionStorageEvaluator();
+		sessionStorageEvaluator.setSessionStorageEnabled(false);
+		subjectDAO.setSessionStorageEvaluator(sessionStorageEvaluator);
+		securityManager.setSubjectDAO(subjectDAO);
+		
+		// 设置缓存管理器
 		securityManager.setCacheManager(new MemoryConstrainedCacheManager());
 		return securityManager;
-	}
-
-	/**
-	 * Method name: sessionManager <BR>
-	 * Description: 设置Session <BR>
-	 * 
-	 * @return SessionManager<BR>
-	 */
-	@Bean
-	public SessionManager sessionManager() {
-		DefaultWebSessionManager shiroSessionManager = new DefaultWebSessionManager();
-		shiroSessionManager.setSessionDAO(new MemorySessionDAO());
-		shiroSessionManager.setSessionValidationSchedulerEnabled(false);
-		return shiroSessionManager;
 	}
 
 }

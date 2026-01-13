@@ -197,7 +197,7 @@ import { ref, reactive, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import http from '../api/http';
-import { getUserInfo, clearUserInfo, saveUserInfo, type UserInfo, ROLE_ADMIN, ROLE_DOCTOR, ROLE_USER, roleToString, getDeviceId } from '../utils/user';
+import { getUserInfo, clearUserInfo, clearUserInfoOnly, saveUserInfo, type UserInfo, ROLE_ADMIN, ROLE_DOCTOR, ROLE_USER, roleToString, getDeviceId } from '../utils/user';
 import { getCurrentUserInfo } from '../api/user';
 import { showMessage, showConfirm } from '../utils/message';
 
@@ -580,7 +580,8 @@ async function handleLogout() {
     } else {
       clearUserInfo(); // 如果没有用户信息，清除所有（向后兼容）
     }
-    router.push('/');
+    // 使用window.location强制刷新页面，确保清除所有状态
+    window.location.href = '/';
   }
 }
 
@@ -630,8 +631,10 @@ async function loadUserInfo() {
         } else {
           // 角色匹配，但用户ID不同，可能是同一角色的不同用户
           // 这种情况可能是正常的（比如管理员A退出，管理员B登录），允许切换
+          // 注意：不清除Token，只清除旧的用户信息，因为Token仍然有效
           console.warn('用户ID不同，但角色匹配，允许切换');
-          clearUserInfo();
+          // 只清除旧的用户信息，保留Token以便后续请求
+          clearUserInfoOnly(savedUserInfo.id, savedUserInfo.role);
         }
       }
       

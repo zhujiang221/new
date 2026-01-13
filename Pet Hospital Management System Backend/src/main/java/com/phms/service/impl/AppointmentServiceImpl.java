@@ -79,18 +79,18 @@ public class AppointmentServiceImpl implements AppointmentService {
 
             // 查询对应的排班记录（带行锁）
             DoctorSchedule schedule = doctorScheduleMapper.selectByDoctorWeekAndTimeSlot(
-                appointment.getDoctorId(),
-                weekDay,
+                appointment.getDoctorId(), 
+                weekDay, 
                 appointment.getTimeSlot()
             );
-            
+
             if (schedule == null) {
                 // 找不到对应的排班记录
                 logger.warn("预约失败：找不到排班记录 - 医生ID={}, 星期={}, 时间段={}", 
                     appointment.getDoctorId(), weekDay, appointment.getTimeSlot());
                 return false;
             }
-            
+
             // 检查排班状态是否为停用
             if (schedule.getStatus() != null && schedule.getStatus() == 0) {
                 logger.warn("预约失败：排班已停用 - 医生ID={}, 星期={}, 时间段={}", 
@@ -101,15 +101,8 @@ public class AppointmentServiceImpl implements AppointmentService {
             // 排班存在且启用，插入预约记录
             appointmentMapper.insert(appointment);
             
-            // 验证ID是否已生成
-            if (appointment.getId() == null) {
-                logger.error("预约插入失败：未获取到生成的ID - 医生ID={}, 日期={}, 时间段={}", 
-                    appointment.getDoctorId(), appDate, appointment.getTimeSlot());
-                return false;
-            }
-            
-            logger.info("预约成功：预约ID={}, 医生ID={}, 日期={}, 时间段={}", 
-                appointment.getId(), appointment.getDoctorId(), appDate, appointment.getTimeSlot());
+            logger.info("预约成功：医生ID={}, 日期={}, 时间段={}", 
+                appointment.getDoctorId(), appDate, appointment.getTimeSlot());
             
             return true;
         } catch (Exception e) {

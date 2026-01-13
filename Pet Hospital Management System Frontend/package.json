@@ -15,7 +15,10 @@
     "test:auth": "playwright test e2e/tests/auth.spec.ts",
     "test:user": "playwright test e2e/tests/user/",
     "test:doctor": "playwright test e2e/tests/doctor/",
-    "test:admin": "playwright test e2e/tests/admin/"
+    "test:admin": "playwright test e2e/tests/admin/",
+    "test:all": "playwright test && node e2e/generate-report.js",
+    "test:report:generate": "node e2e/generate-report.js",
+    "test:report:open": "playwright show-report"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -29,6 +32,7 @@
     "@playwright/test": "^1.40.0",
     "@types/node": "^25.0.3",
     "@vitejs/plugin-vue": "^5.1.2",
+    "allure-playwright": "^2.9.2",
     "typescript": "^5.9.3",
     "vite": "^5.4.10"
   }

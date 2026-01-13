@@ -173,7 +173,7 @@ import { ref, reactive, computed, onMounted, watch, onUnmounted, nextTick } from
 import { useRouter, useRoute } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import http from '../../api/http';
-import { getUserInfo, clearUserInfo, saveUserInfo, type UserInfo, ROLE_DOCTOR, ROLE_ADMIN, ROLE_USER, getDeviceId } from '../../utils/user';
+import { getUserInfo, clearUserInfo, clearUserInfoOnly, saveUserInfo, type UserInfo, ROLE_DOCTOR, ROLE_ADMIN, ROLE_USER, getDeviceId } from '../../utils/user';
 import { getCurrentUserInfo } from '../../api/user';
 import { showMessage, showConfirm } from '../../utils/message';
 import UserHome from './UserHome.vue';
@@ -521,7 +521,8 @@ async function handleLogout() {
     } else {
       clearUserInfo(); // 如果没有用户信息，清除所有（向后兼容）
     }
-    router.push('/');
+    // 使用window.location强制刷新页面，确保清除所有状态
+    window.location.href = '/';
   }
 }
 
@@ -563,8 +564,9 @@ async function loadUserInfo() {
         } else {
           // 角色匹配，但用户ID不同，可能是同一角色的不同用户
           // 这种情况可能是正常的（比如用户A退出，用户B登录），允许切换
+          // 注意：不清除Token，只清除旧的用户信息，因为Token仍然有效
           console.warn('用户ID不同，但角色匹配，允许切换');
-          clearUserInfo();
+          clearUserInfoOnly(savedUserInfo.id, savedUserInfo.role);
         }
       }
       
@@ -641,10 +643,16 @@ onMounted(() => {
   }
   
   // 电脑端：如果路径是 /user，自动重定向到第一个子路由 /user/pets
+  // 移动端：保持 /user 路径，显示主页（UserHome组件）
   // 使用 nextTick 确保移动端检测完成
   nextTick(() => {
     if (!isMobile.value && route.path === '/user') {
       router.replace('/user/pets');
+    }
+    // 移动端：如果路径是 /user，确保显示主页视图
+    if (isMobile.value && route.path === '/user') {
+      showMainPageView.value = true;
+      currentTab.value = 'home';
     }
   });
 });
@@ -704,18 +712,8 @@ watch(() => route.path, (newPath, oldPath) => {
         return;
       } 
       
-      // 其他情况：检查是否是首次加载或路由重定向
-      // oldPath 可能是 undefined（首次加载）或 '/user'（从主页面跳转）
-      const isInitialLoad = !oldPath || oldPath === '/user' || oldPath === newPath;
-      
-      if (isInitialLoad) {
-        // 首次加载时，如果是从 /user 跳转过来的（不应该发生，因为已经移除了redirect）
-        // 或者用户直接访问子路由，显示路由视图
-        showMainPageView.value = false;
-      } else {
-        // 路由变化但不确定原因，默认显示路由视图
-        showMainPageView.value = false;
-      }
+      // 其他情况：显示路由视图（用户直接访问子路由或从其他页面跳转）
+      showMainPageView.value = false;
     }
   }
 }, { immediate: true });

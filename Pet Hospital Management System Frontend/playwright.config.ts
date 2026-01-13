@@ -22,8 +22,15 @@ export default defineConfig({
 
   // 测试报告
   reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
+    ['html', { 
+      outputFolder: 'playwright-report',
+      open: 'never' // 不自动打开报告
+    }],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['junit', { outputFile: 'test-results/junit.xml' }],
     ['list']
+    // 如果需要Allure报告，取消下面的注释并安装 allure-playwright
+    // ['allure-playwright', { outputFolder: 'allure-results' }]
   ],
 
   // 全局设置
@@ -35,10 +42,16 @@ export default defineConfig({
     trace: 'on-first-retry',
 
     // 截图设置
-    screenshot: 'only-on-failure',
+    screenshot: {
+      mode: 'only-on-failure',
+      fullPage: true
+    },
 
     // 视频录制
-    video: 'on-first-retry',
+    video: {
+      mode: 'on-first-retry',
+      size: { width: 1280, height: 720 }
+    },
 
     // 超时设置
     actionTimeout: 10000,

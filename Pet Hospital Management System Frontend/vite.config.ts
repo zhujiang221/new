@@ -69,7 +69,35 @@ export default defineConfig({
       
       // 1. 精确匹配所有已知的API子路径（优先级最高）
       // 匹配格式：/user/{module}/{action}，如 /user/pet/getAllByLimit
-      '^/user/(apply|pet|petDaily|diagnosis|notice|standard|medicine|medicineRecord)/.+': {
+      '/user/pet/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/apply/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/petDaily/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/diagnosis/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/notice/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/standard/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/medicine/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      '/user/medicineRecord/': {
         target: PROXY_TARGET,
         changeOrigin: true
       },
@@ -97,7 +125,19 @@ export default defineConfig({
         target: PROXY_TARGET,
         changeOrigin: true
       },
-      // WebSocket proxy for notifications
+      // Notification APIs
+      '/notification': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      // WebSocket proxy for notifications (must be before other /ws rules)
+      '/ws/notification': {
+        target: PROXY_TARGET,
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path // 保持路径不变
+      },
+      // WebSocket proxy (fallback for other /ws paths)
       '/ws': {
         target: PROXY_TARGET,
         ws: true,

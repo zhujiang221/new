@@ -4,8 +4,7 @@ import com.phms.mapper.UserMapper;
 import com.phms.pojo.AppointmentType;
 import com.phms.pojo.User;
 import com.phms.service.AppointmentTypeService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +31,9 @@ public class AppointmentTypeController {
     
     @Autowired
     private UserMapper userMapper;
+    
+    @Autowired
+    private UserContext userContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     
@@ -39,37 +41,7 @@ public class AppointmentTypeController {
      * 获取当前登录用户，如果从Subject获取的用户role为null，则从数据库重新获取
      */
     private User getCurrentUser() {
-        try {
-            Subject subject = SecurityUtils.getSubject();
-            if (subject == null) {
-                logger.warn("Subject为null，无法获取用户信息");
-                return null;
-            }
-            
-            User user = (User) subject.getPrincipal();
-            if (user == null) {
-                logger.warn("从Subject获取的User为null");
-                return null;
-            }
-            
-            // 如果role为null，尝试从数据库重新获取用户信息
-            if (user.getRole() == null) {
-                logger.warn("从Subject获取的User role为null，用户ID: {}，尝试从数据库重新获取", user.getId());
-                User dbUser = userMapper.selectByPrimaryKey(user.getId());
-                if (dbUser != null && dbUser.getRole() != null) {
-                    logger.info("从数据库重新获取用户成功，用户ID: {}，角色: {}", dbUser.getId(), dbUser.getRole());
-                    return dbUser;
-                } else {
-                    logger.warn("从数据库重新获取用户失败或role仍为null，用户ID: {}", user.getId());
-                    return user;
-                }
-            }
-            
-            return user;
-        } catch (Exception e) {
-            logger.error("获取当前用户时发生异常", e);
-            return null;
-        }
+        return userContext.getCurrentUser();
     }
     
     /**

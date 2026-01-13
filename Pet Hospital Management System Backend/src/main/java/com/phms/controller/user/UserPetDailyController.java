@@ -3,8 +3,7 @@ package com.phms.controller.user;
 import com.phms.pojo.PetDaily;
 import com.phms.pojo.User;
 import com.phms.service.PetDailyService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +23,8 @@ import java.util.Date;
 public class UserPetDailyController {
     @Autowired
     private PetDailyService petDailyService;
+    @Autowired
+    private UserContext UserContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
@@ -59,8 +60,11 @@ public class UserPetDailyController {
     @RequestMapping("/getAllByLimit")
     @ResponseBody
     public Object getAllByLimit(PetDaily pojo) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            throw new RuntimeException("用户未登录");
+        }
         pojo.setUserId(user.getId());
         return petDailyService.getAllByLimit(pojo);
     }
@@ -117,8 +121,11 @@ public class UserPetDailyController {
     @ResponseBody
     @Transactional
     public String doAdd(PetDaily pojo) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         try {
             pojo.setUserId(user.getId());
             pojo.setCreateTime(new Date());

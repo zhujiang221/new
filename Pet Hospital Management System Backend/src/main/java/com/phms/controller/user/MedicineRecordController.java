@@ -6,8 +6,7 @@ import com.phms.pojo.User;
 import com.phms.service.MedicineRecordService;
 import com.phms.service.MedicineService;
 import com.phms.service.UserService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +32,9 @@ public class MedicineRecordController {
     private MedicineService medicineService;
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private UserContext userContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -42,8 +44,11 @@ public class MedicineRecordController {
     @RequestMapping("/getAllByLimit")
     @ResponseBody
     public Object getAllByLimit(MedicineRecord medicineRecord) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         if (user != null) {
             medicineRecord.setUserId(user.getId());
         }
@@ -76,8 +81,11 @@ public class MedicineRecordController {
     @ResponseBody
     @Transactional
     public String doAdd(MedicineRecord medicineRecord) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 验证权限：只有医生(roleId=2)可以开药
         if (user == null) {
@@ -130,8 +138,11 @@ public class MedicineRecordController {
     @ResponseBody
     @Transactional
     public String del(Long id) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)可以删除
         if (user == null) {

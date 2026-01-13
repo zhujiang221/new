@@ -188,8 +188,9 @@ import { ref, reactive, computed, onMounted, watch, onUnmounted, nextTick } from
 import { useRouter, useRoute } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import http from '../../api/http';
-import { getUserInfo, clearUserInfo, saveUserInfo, type UserInfo, ROLE_DOCTOR, ROLE_ADMIN, ROLE_USER, getDeviceId } from '../../utils/user';
+import { getUserInfo, clearUserInfo, clearUserInfoOnly, saveUserInfo, type UserInfo, ROLE_DOCTOR, ROLE_ADMIN, ROLE_USER, getDeviceId } from '../../utils/user';
 import { getCurrentUserInfo } from '../../api/user';
+import { getToken } from '../../utils/token';
 import { showMessage, showConfirm } from '../../utils/message';
 import { useNotification } from '../../composables/useNotification';
 import NotificationModal from '../../components/NotificationModal.vue';
@@ -257,34 +258,61 @@ const notificationMessage = ref('您有新消息');
 
 // 处理新消息到达（用于显示弹窗）
 function handleNewMessage(message: any) {
-  console.log('收到新消息，准备显示弹窗:', message);
+  console.log('DoctorLayout收到新消息，准备显示弹窗:', message);
+  console.log('消息类型:', typeof message);
+  console.log('消息内容:', JSON.stringify(message, null, 2));
+  
   try {
-    if (message && message.title) {
-      let messageText = message.title;
-      // 尝试解析消息内容
-      if (message.content) {
-        try {
-          const content = JSON.parse(message.content);
+    if (!message) {
+      console.warn('消息为空，使用默认消息');
+      notificationMessage.value = '您有新预约消息';
+      nextTick(() => {
+        showNotificationModal.value = true;
+      });
+      return;
+    }
+    
+    let messageText = '您有新预约消息';
+    
+    // 检查消息标题
+    if (message.title) {
+      messageText = message.title;
+    }
+    
+    // 尝试解析消息内容（content字段是JSON字符串）
+    if (message.content) {
+      try {
+        const content = typeof message.content === 'string' 
+          ? JSON.parse(message.content) 
+          : message.content;
+        
+        console.log('解析后的消息内容:', content);
+        
+        if (content && typeof content === 'object') {
           if (content.userName && content.appointmentTypeName) {
             messageText = `${content.userName}预约了${content.appointmentTypeName}`;
             if (content.appDate && content.timeSlot) {
               messageText += `，时间：${content.appDate} ${content.timeSlot}`;
             }
+          } else if (content.userName) {
+            messageText = `${content.userName}提交了新的预约申请`;
           }
-        } catch (e) {
-          console.warn('解析消息内容失败:', e);
         }
+      } catch (e) {
+        console.warn('解析消息内容失败:', e, '原始content:', message.content);
       }
-      notificationMessage.value = messageText;
-    } else {
-      notificationMessage.value = '您有新预约消息';
     }
+    
+    notificationMessage.value = messageText;
+    console.log('设置弹窗消息:', messageText);
+    
     // 使用nextTick确保DOM已更新
     nextTick(() => {
+      console.log('显示弹窗，消息:', messageText);
       showNotificationModal.value = true;
     });
   } catch (e) {
-    console.error('处理新消息失败:', e);
+    console.error('处理新消息失败:', e, '消息对象:', message);
     notificationMessage.value = '您有新预约消息';
     nextTick(() => {
       showNotificationModal.value = true;
@@ -605,7 +633,8 @@ async function handleLogout() {
     } else {
       clearUserInfo(); // 如果没有用户信息，清除所有（向后兼容）
     }
-    router.push('/');
+    // 使用window.location强制刷新页面，确保清除所有状态
+    window.location.href = '/';
   }
 }
 
@@ -628,7 +657,7 @@ async function loadUserInfo() {
   if (savedUserInfo && savedUserInfo.id && savedUserInfo.role === expectedRole) {
     console.log('本地有用户信息，且角色匹配，进行双重验证');
     
-    // 3. 从后端获取最新的用户信息
+    // 3. 从后端获取最新的用户信息（注意：此时Token应该已经存在）
     const apiUserInfo = await getCurrentUserInfo();
     
     if (apiUserInfo && apiUserInfo.id) {
@@ -649,7 +678,8 @@ async function loadUserInfo() {
           // 角色匹配，但用户ID不同，可能是同一角色的不同用户
           // 这种情况可能是正常的（比如医生A退出，医生B登录），允许切换
           console.warn('用户ID不同，但角色匹配，允许切换');
-          clearUserInfo();
+          // 只清除用户信息，保留Token
+          clearUserInfoOnly(savedUserInfo.id, savedUserInfo.role);
         }
       }
       
@@ -715,30 +745,52 @@ async function loadUserInfo() {
   if (userId) {
     console.log('初始化消息提醒功能，用户ID:', userId);
     
+    // 确保Token存在
+    const token = getToken();
+    if (!token) {
+      console.warn('Token不存在，无法初始化消息提醒功能');
+      return;
+    }
+    
     // 设置新消息回调（用于显示弹窗）
     setOnNewMessageCallback(handleNewMessage);
     
     // 初始化WebSocket连接
     initWebSocket();
     
-    // 获取未读消息数量
-    await fetchUnreadCount();
-    console.log('未读消息数量:', unreadCount.value);
-    
-    // 登录时检查未读消息
-    const checkResult = await checkOnLogin();
-    console.log('checkOnLogin结果:', checkResult);
-    
-    if (checkResult && checkResult.hasUnread) {
-      console.log('显示消息弹窗:', checkResult.message);
-      notificationMessage.value = checkResult.message;
-      // 使用nextTick确保DOM已更新
-      nextTick(() => {
-        showNotificationModal.value = true;
-      });
-    } else {
-      console.log('没有未读消息，不显示弹窗');
-    }
+    // 延迟获取未读消息数量，确保Token已经正确设置
+    // 使用setTimeout确保在下一个事件循环中执行，给Token设置足够的时间
+    setTimeout(async () => {
+      try {
+        // 再次检查Token是否存在
+        const currentToken = getToken();
+        if (!currentToken) {
+          console.warn('Token不存在，跳过消息提醒初始化');
+          return;
+        }
+        
+        // 获取未读消息数量
+        await fetchUnreadCount();
+        console.log('未读消息数量:', unreadCount.value);
+        
+        // 登录时检查未读消息
+        const checkResult = await checkOnLogin();
+        console.log('checkOnLogin结果:', checkResult);
+        
+        if (checkResult && checkResult.hasUnread) {
+          console.log('显示消息弹窗:', checkResult.message);
+          notificationMessage.value = checkResult.message;
+          // 使用nextTick确保DOM已更新
+          nextTick(() => {
+            showNotificationModal.value = true;
+          });
+        } else {
+          console.log('没有未读消息，不显示弹窗');
+        }
+      } catch (e) {
+        console.error('初始化消息提醒功能失败:', e);
+      }
+    }, 100); // 延迟100ms，确保Token已经设置
   } else {
     console.warn('用户ID为空，无法初始化消息提醒功能');
   }
@@ -772,10 +824,16 @@ onMounted(() => {
   }
   
   // 电脑端：如果路径是 /doctor，自动重定向到第一个子路由 /doctor/apply
+  // 移动端：保持 /doctor 路径，显示主页（DoctorHome组件）
   // 使用 nextTick 确保移动端检测完成
   nextTick(() => {
     if (!isMobile.value && route.path === '/doctor') {
       router.replace('/doctor/apply');
+    }
+    // 移动端：如果路径是 /doctor，确保显示主页视图
+    if (isMobile.value && route.path === '/doctor') {
+      showMainPageView.value = true;
+      currentTab.value = 'home';
     }
   });
 });
@@ -833,18 +891,8 @@ watch(() => route.path, (newPath, oldPath) => {
         return;
       } 
       
-      // 其他情况：检查是否是首次加载或路由重定向
-      // oldPath 可能是 undefined（首次加载）或 '/doctor'（从主页面跳转）
-      const isInitialLoad = !oldPath || oldPath === '/doctor' || oldPath === newPath;
-      
-      if (isInitialLoad) {
-        // 首次加载时，如果是从 /doctor 跳转过来的（不应该发生，因为已经移除了redirect）
-        // 或者用户直接访问子路由，显示路由视图
-        showMainPageView.value = false;
-      } else {
-        // 路由变化但不确定原因，默认显示路由视图
-        showMainPageView.value = false;
-      }
+      // 其他情况：显示路由视图（用户直接访问子路由或从其他页面跳转）
+      showMainPageView.value = false;
     }
   }
 }, { immediate: true });

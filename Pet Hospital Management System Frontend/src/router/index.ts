@@ -85,7 +85,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/user',
     component: UserLayout,
-    // 移除 redirect，让移动端显示主页面组件，电脑端通过 Layout 组件处理默认显示
+    // 不设置默认重定向，让UserLayout根据设备类型决定显示主页还是子路由
     children: [
       {
         path: 'pets',
@@ -177,7 +177,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/doctor',
     component: DoctorLayout,
-    // 移除 redirect，让移动端显示主页面组件，电脑端通过 Layout 组件处理默认显示
+    // 不设置默认重定向，让DoctorLayout根据设备类型决定显示主页还是子路由
     children: [
       {
         path: 'apply',

@@ -3,8 +3,7 @@ package com.phms.controller.user;
 import com.phms.pojo.DoctorSchedule;
 import com.phms.pojo.User;
 import com.phms.service.DoctorScheduleService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +27,9 @@ import java.util.List;
 public class DoctorScheduleController {
     @Autowired
     private DoctorScheduleService doctorScheduleService;
+    
+    @Autowired
+    private UserContext UserContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -38,8 +40,11 @@ public class DoctorScheduleController {
     @RequestMapping("/list")
     @ResponseBody
     public Object getScheduleList(Long doctorId, Integer page, Integer limit) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 如果不是管理员，只能看自己的排班
         if (user != null && user.getRole() != null && user.getRole() != 1 && doctorId == null) {
@@ -73,8 +78,11 @@ public class DoctorScheduleController {
     @ResponseBody
     @Transactional
     public String addSchedule(DoctorSchedule schedule) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 如果不是管理员，只能给自己添加排班
         if (user.getRole() != 1) {
@@ -102,8 +110,11 @@ public class DoctorScheduleController {
     @ResponseBody
     @Transactional
     public String updateSchedule(DoctorSchedule schedule) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 检查权限：如果不是管理员，只能修改自己的排班
         if (user.getRole() != 1) {
@@ -130,8 +141,11 @@ public class DoctorScheduleController {
     @ResponseBody
     @Transactional
     public String deleteSchedule(Long id) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 检查权限
         if (user.getRole() != 1) {
@@ -158,8 +172,11 @@ public class DoctorScheduleController {
     @ResponseBody
     @Transactional
     public String batchSave(List<DoctorSchedule> schedules) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         if (schedules == null || schedules.isEmpty()) {
             return "EMPTY";
@@ -190,8 +207,11 @@ public class DoctorScheduleController {
     @Transactional
     public String applyTemplate(@RequestParam(required = false) Long doctorId, 
                                 @RequestBody List<DoctorSchedule> schedules) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 检查用户是否已登录
         if (user == null) {

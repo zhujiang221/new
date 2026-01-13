@@ -433,10 +433,10 @@ async function fetchDayDetails(date: string) {
     try {
       const [timeSlotsResp, services] = await Promise.all([
         http.get('/user/apply/getAvailableSlots', {
-          params: {
-            doctorId: doctor.id,
-            appDate: date
-          }
+        params: {
+          doctorId: doctor.id,
+          appDate: date
+        }
         }),
         getDoctorServices(doctor.id)
       ]);

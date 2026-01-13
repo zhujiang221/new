@@ -3,8 +3,7 @@ package com.phms.controller.user;
 import com.phms.pojo.Diagnosis;
 import com.phms.pojo.User;
 import com.phms.service.DiagnosisService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +23,8 @@ import java.util.Date;
 public class UserDiagnosisController {
     @Autowired
     private DiagnosisService diagnosisService;
-
+    @Autowired
+    private UserContext UserContext;
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
      * 医生宠物健康史页面user/diagnosisListDoctor.html
@@ -58,8 +58,11 @@ public class UserDiagnosisController {
     @RequestMapping("/getAllByLimit")
     @ResponseBody
     public Object getAllByLimit(Diagnosis diagnosis) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            throw new RuntimeException("用户未登录");
+        }
         diagnosis.setUserId(user.getId());
         return diagnosisService.getAllByLimit(diagnosis);
     }
@@ -108,8 +111,11 @@ public class UserDiagnosisController {
     @ResponseBody
     @Transactional
     public String doAdd(Diagnosis diagnosis) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         try {
             // 医生登录id
             diagnosis.setDoctorId(user.getId());
@@ -132,8 +138,11 @@ public class UserDiagnosisController {
     @ResponseBody
     @Transactional
     public String chStatus(Diagnosis diagnosis) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         try {
             // 医生登录id
             diagnosis.setDoctorId(user.getId());

@@ -9,6 +9,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import http from '../api/http';
 import { websocketManager, type WebSocketMessage } from '../utils/websocket';
 import { getUserInfo } from '../utils/user';
+import { getToken } from '../utils/token';
 
 export interface NotificationMessage {
   id: number;
@@ -50,12 +51,24 @@ export function useNotification() {
    */
   async function fetchUnreadCount() {
     try {
+      // 确保Token存在
+      const token = getToken();
+      if (!token) {
+        console.warn('fetchUnreadCount: Token不存在，跳过获取');
+        unreadCount.value = 0;
+        return;
+      }
+      
       const resp = await http.get('/notification/unreadCount');
       if (typeof resp.data === 'number') {
         unreadCount.value = resp.data;
+      } else {
+        console.warn('fetchUnreadCount: 返回数据格式不正确:', resp.data);
+        unreadCount.value = 0;
       }
     } catch (e) {
       console.error('获取未读消息数量失败:', e);
+      unreadCount.value = 0;
     }
   }
 
@@ -128,13 +141,46 @@ export function useNotification() {
    */
   async function checkOnLogin() {
     try {
+      // 确保Token存在
+      const token = getToken();
+      if (!token) {
+        console.warn('checkOnLogin: Token不存在，跳过检查');
+        return {
+          hasUnread: false,
+          unreadCount: 0,
+          message: '检查消息失败：未登录'
+        };
+      }
+      
       const resp = await http.get('/notification/checkOnLogin');
       console.log('checkOnLogin响应:', resp.data);
       
       // 处理不同的响应格式
       let data = resp.data;
-      // 如果返回的是字符串（错误情况），直接返回
+      
+      // 如果返回的是字符串（可能是错误信息或HTML页面）
       if (typeof data === 'string') {
+        // 检查是否是HTML页面（错误情况）
+        if (data.trim().startsWith('<!DOCTYPE') || data.trim().startsWith('<html')) {
+          console.error('checkOnLogin返回HTML页面，可能是Token无效或请求被重定向');
+          return {
+            hasUnread: false,
+            unreadCount: 0,
+            message: '检查消息失败：请求被重定向'
+          };
+        }
+        
+        // 如果是错误信息字符串
+        if (data === 'NOT_LOGIN' || data === 'ERROR') {
+          console.warn('checkOnLogin返回错误:', data);
+          return {
+            hasUnread: false,
+            unreadCount: 0,
+            message: '检查消息失败'
+          };
+        }
+        
+        // 其他字符串情况
         console.warn('checkOnLogin返回字符串:', data);
         return {
           hasUnread: false,
@@ -178,20 +224,47 @@ export function useNotification() {
    * 处理WebSocket消息
    */
   function handleWebSocketMessage(message: WebSocketMessage) {
-    if (message.type === 'notification' || message.data) {
+    console.log('handleWebSocketMessage收到消息:', message);
+    
+    // 检查消息类型和数据
+    // message.data 是后端发送的 NotificationMessage 对象
+    // 如果 message.data 不存在，可能是消息格式不同，尝试使用 message 本身
+    let messageData: any = null;
+    
+    if (message.data) {
+      messageData = message.data;
+    } else if (message && typeof message === 'object' && 'receiverId' in message) {
+      // 如果消息本身就是 NotificationMessage 对象
+      messageData = message;
+    }
+    
+    if (messageData) {
+      console.log('解析到消息数据:', messageData);
+      
       // 收到新消息，增加未读数量
       unreadCount.value++;
-      // 如果有消息列表，将新消息添加到列表顶部
-      if (message.data && message.data.id) {
-        const newMessage = message.data as NotificationMessage;
-        messageList.value.unshift(newMessage);
-        
-        // 触发新消息回调（用于显示弹窗）
-        if (onNewMessageCallback) {
-          console.log('收到新消息，触发弹窗回调:', newMessage);
-          onNewMessageCallback(newMessage);
+      
+      // 将新消息添加到列表顶部（如果有ID）
+      if (messageData.id) {
+        const newMessage = messageData as NotificationMessage;
+        // 检查是否已存在（避免重复添加）
+        const exists = messageList.value.some(m => m.id === newMessage.id);
+        if (!exists) {
+          messageList.value.unshift(newMessage);
+          console.log('新消息已添加到列表:', newMessage);
         }
       }
+      
+      // 触发新消息回调（用于显示弹窗）
+      // 无论是否有ID，都应该显示弹窗
+      if (onNewMessageCallback) {
+        console.log('触发弹窗回调，消息数据:', messageData);
+        onNewMessageCallback(messageData as NotificationMessage);
+      } else {
+        console.warn('onNewMessageCallback未设置，无法显示弹窗');
+      }
+    } else {
+      console.warn('WebSocket消息格式不正确，无法解析消息数据:', message);
     }
   }
   

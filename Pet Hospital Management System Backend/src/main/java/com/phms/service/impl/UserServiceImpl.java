@@ -7,7 +7,6 @@ import com.phms.pojo.*;
 import com.phms.service.UserService;
 import com.phms.utils.MD5;
 import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,39 +29,42 @@ public class UserServiceImpl implements UserService {
 
 	/**
 	 *      Description: 登录server <BR>
-	 *      Remark: <BR>
+	 *      Remark: JWT模式下，直接验证用户名和密码，不使用Shiro的UsernamePasswordToken <BR>
 	 * @param username 用户名
-	 * @param password 密码
+	 * @param password 密码（明文）
 	 * @return <BR>
 	 */
 	@Override
 	public ResultMap login(String username, String password) {
-		// 从SecurityUtils里边创建一个 subject
-		Subject subject = SecurityUtils.getSubject();
-		// 在认证提交前准备 token（令牌）
-		UsernamePasswordToken token = new UsernamePasswordToken(username, MD5.md5(password));
-		// 执行认证登陆
 		try {
-			subject.login(token);
-			
-			// 登录成功后，从数据库重新获取用户信息（避免 session 问题）
+			// 直接从数据库查询用户
 			User user = userMapper.getByUsername(username);
 			if (user == null) {
-				logger.error("登录成功但无法获取用户信息: username={}", username);
-				return resultMap.fail().message("获取用户信息失败");
+				logger.warn("登录失败: 用户不存在, username={}", username);
+				return resultMap.fail().message("USERNAME_NOT_EXIST");
 			}
 			
-			// 根据权限，指定返回数据（从user表的role字段获取）
-			if (user.getRole() != null) {
-				Integer role = user.getRole();
-				String roleName = role == 1 ? "管理员" : (role == 2 ? "医生" : "用户");
-				logger.info("欢迎登录------您的权限是{}", roleName);
-				// 返回用户信息，包括角色
-				return resultMap.success().message("欢迎登陆").data(user);
+			// 验证密码（数据库中存储的是MD5加密后的密码）
+			String encryptedPassword = MD5.md5(password);
+			if (!encryptedPassword.equals(user.getPassword())) {
+				logger.warn("登录失败: 密码错误, username={}", username);
+				return resultMap.fail().message("PASSWORD_ERR");
 			}
-			return resultMap.fail().message("权限错误！");
+			
+			// 验证用户角色
+			if (user.getRole() == null) {
+				logger.error("登录失败: 用户角色为空, username={}", username);
+				return resultMap.fail().message("权限错误！");
+			}
+			
+			Integer role = user.getRole();
+			String roleName = role == 1 ? "管理员" : (role == 2 ? "医生" : "用户");
+			logger.info("欢迎登录------您的权限是{}, username={}", roleName, username);
+			
+			// 返回用户信息，包括角色（JWT Token由LoginController生成）
+			return resultMap.success().message("欢迎登陆").data(user);
 		} catch (Exception e) {
-			logger.error("登录失败: {}", e.getMessage(), e);
+			logger.error("登录失败: username={}, error={}", username, e.getMessage(), e);
 			// 返回更友好的错误信息
 			String errorMsg = e.getMessage();
 			if (errorMsg == null || errorMsg.isEmpty()) {

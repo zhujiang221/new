@@ -420,7 +420,8 @@ async function handleLogout() {
       // Ignore logout errors
     }
     clearUserInfo();
-    router.push('/');
+    // 使用window.location强制刷新页面，确保清除所有状态
+    window.location.href = '/';
   }
 }
 

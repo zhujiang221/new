@@ -2,19 +2,20 @@ package com.phms.shiro;
 
 import com.phms.mapper.UserMapper;
 import com.phms.pojo.User;
+import com.phms.utils.JwtUtil;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.*;
 import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
 import org.apache.shiro.realm.AuthorizingRealm;
-import org.apache.shiro.session.Session;
 import org.apache.shiro.subject.PrincipalCollection;
-import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Component
 public class CustomRealm extends AuthorizingRealm {
@@ -22,11 +23,20 @@ public class CustomRealm extends AuthorizingRealm {
 	private final UserMapper userMapper;
 	/** logback日志记录 */
 	private final Logger logger = LoggerFactory.getLogger(CustomRealm.class);
-
-	private static Map<String, Session> sessionMap = new HashMap<>();
+	
+	@Autowired
+	private JwtUtil jwtUtil;
 
 	public CustomRealm(UserMapper userMapper) {
 		this.userMapper = userMapper;
+	}
+	
+	/**
+	 * 指定此Realm只支持JwtToken
+	 */
+	@Override
+	public boolean supports(AuthenticationToken token) {
+		return token instanceof JwtToken;
 	}
 
 
@@ -36,68 +46,35 @@ public class CustomRealm extends AuthorizingRealm {
 	 *      <BR>
 	 *      Method name: doGetAuthenticationInfo <BR>
 	 *      获取身份验证信息 Description: Shiro中，最终是通过 Realm 来获取应用程序中的用户、角色及权限信息的。 <BR>
-	 * @param authenticationToken 用户身份信息 token
+	 * @param authenticationToken 用户身份信息 token（JwtToken）
 	 * @return 返回封装了用户信息的 AuthenticationInfo 实例
 	 * @throws AuthenticationException <BR>
 	 */
 	@Override
 	protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken authenticationToken)
 			throws AuthenticationException {
-		// 获取token令牌
-		UsernamePasswordToken token = (UsernamePasswordToken) authenticationToken;
-		// 从数据库根据username字段获取对应用户名密码的用户
-		User user = userMapper.getByUsername(token.getUsername());
+		// 获取JwtToken
+		JwtToken jwtToken = (JwtToken) authenticationToken;
+		String token = jwtToken.getToken();
+		
+		// 从Token中解析用户名
+		String username = jwtUtil.getUsernameFromToken(token);
+		if (username == null) {
+			logger.warn("JWT Token解析失败，无法获取用户名");
+			throw new AuthenticationException("Token无效");
+		}
+		
+		// 从数据库根据username字段获取对应用户
+		User user = userMapper.getByUsername(username);
 		if (null == user) {
-			logger.warn("{}---用户不存在", token.getUsername());
-			// 向前台抛出用户不存在json对象
+			logger.warn("{}---用户不存在", username);
 			throw new AccountException("USERNAME_NOT_EXIST");
 		}
-		String password = user.getPassword();
-		if (null == password) {
-			logger.warn("{}---用户不存在", token.getUsername());
-			// 向前台抛出用户不存在json对象
-			throw new AccountException("USERNAME_NOT_EXIST");
-		} else if (!password.equals(new String((char[]) token.getCredentials()))) {
-			logger.warn("{}---输入密码错误", token.getUsername());
-			// 向前台抛出输入密码错误json对象
-			throw new AccountException("PASSWORD_ERR");
-		}
-		logger.info("{}---身份认证成功", user.getName());
 		
-		// 先返回认证信息，让 Shiro 完成认证流程
-		SimpleAuthenticationInfo authInfo = new SimpleAuthenticationInfo(user, password, getName());
+		logger.info("{}---JWT身份认证成功", user.getName());
 		
-		// 在认证成功后，异步处理 session 管理（避免在认证过程中访问 session 导致的问题）
-		try {
-			Subject subject = SecurityUtils.getSubject();
-			if (subject != null) {
-				// 确保 session 已创建
-				Session session = subject.getSession(false);
-				if (session != null) {
-					// 设置shiro session过期时间(单位是毫秒!) 2小时
-					session.setTimeout(7_200_000);
-					
-					String uid = user.getId() + "";
-					
-					// 处理同一用户多次登录的情况：清除旧 session
-					Session oldSession = sessionMap.get(uid);
-					if (oldSession != null) {
-						try {
-							oldSession.setTimeout(0);
-							oldSession.stop();
-						} catch (Exception e) {
-							logger.warn("清除旧 session 失败: {}", e.getMessage());
-						}
-						sessionMap.remove(uid);
-					}
-					
-					// 保存当前 session 到全局变量
-					sessionMap.put(uid, session);
-				}
-			}
-		} catch (Exception e) {
-			logger.warn("处理 session 时出现异常，但不影响登录: {}", e.getMessage());
-		}
+		// 返回认证信息（JWT不需要密码验证，Token已经验证过了）
+		SimpleAuthenticationInfo authInfo = new SimpleAuthenticationInfo(user, token, getName());
 		
 		return authInfo;
 	}
@@ -130,7 +107,7 @@ public class CustomRealm extends AuthorizingRealm {
 				roles.add("user");
 			}
 		} else {
-			logger.warn("用户session失效或角色信息为空!");
+			logger.warn("用户信息或角色信息为空!");
 		}
 		// 设置该用户拥有的角色
 		info.setRoles(roles);

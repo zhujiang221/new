@@ -6,6 +6,7 @@ import com.phms.pojo.User;
 import com.phms.service.EmailCodeService;
 import com.phms.service.UserService;
 import com.phms.utils.CaptchaUtil;
+import com.phms.utils.JwtUtil;
 import com.phms.utils.MD5;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
@@ -17,13 +18,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
+
 import javax.imageio.ImageIO;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.Date;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 登录控制类
@@ -37,8 +41,15 @@ public class LoginController {
 	private UserService userService;
 	@Autowired
 	private EmailCodeService emailCodeService;
+	@Autowired
+	private StringRedisTemplate stringRedisTemplate;
+	@Autowired
+	private JwtUtil jwtUtil;
 
 	private final Logger logger = LoggerFactory.getLogger(LoginController.class);
+	
+	// Redis中验证码存储的key前缀
+	private static final String CAPTCHA_KEY_PREFIX = "captcha:";
 
 	/**
 	 * 返回 尚未登陆信息
@@ -93,6 +104,7 @@ public class LoginController {
 	 * Method name: logout <BR>
 	 * Description: 退出登录 <BR>
 	 * 注意：已移除HTML前端，此方法改为返回JSON响应，Vue前端使用此接口
+	 * 清除Redis中的Token，实现单设备登录
 	 * @return ResultMap<BR>
 	 */
 	@RequestMapping(value = "/logout", method = RequestMethod.GET)
@@ -102,41 +114,48 @@ public class LoginController {
 		User user = (User) subject.getPrincipal();
 		if (null != user) {
 			logger.info("{}---退出登录！", user.getName());
+			// 清除Redis中的Token，使Token失效
+			jwtUtil.invalidateToken(user.getUsername());
 		}
-		subject.logout();
 		return resultMap.success().message("退出登录成功");
 	}
 
 	/**
 	 * 生成验证码图片
 	 * 
-	 * @param request HttpServletRequest
-	 * @param response HttpServletResponse
+	 * @return ResultMap 包含验证码图片base64编码和唯一标识
 	 */
 	@RequestMapping(value = "/captcha", method = RequestMethod.GET)
-	public void getCaptcha(HttpServletRequest request, HttpServletResponse response) {
+	@ResponseBody
+	public ResultMap getCaptcha() {
 		try {
 			// 生成验证码
 			CaptchaUtil.CaptchaResult captchaResult = CaptchaUtil.generateCaptcha();
 			String code = captchaResult.getCode();
 			BufferedImage image = captchaResult.getImage();
 			
-			// 将验证码存储到Session中
-			HttpSession session = request.getSession();
-			session.setAttribute("captcha", code);
-			session.setAttribute("captchaTime", System.currentTimeMillis());
+			// 生成验证码唯一标识
+			String captchaId = UUID.randomUUID().toString().replace("-", "");
 			
-			// 设置响应头，禁止缓存
-			response.setHeader("Pragma", "no-cache");
-			response.setHeader("Cache-Control", "no-cache");
-			response.setDateHeader("Expires", 0);
-			response.setContentType("image/jpeg");
+			// 将验证码存储到Redis，设置5分钟过期
+			String captchaKey = CAPTCHA_KEY_PREFIX + captchaId;
+			stringRedisTemplate.opsForValue().set(captchaKey, code, 5, TimeUnit.MINUTES);
 			
-			// 将图片输出到响应流
-			ImageIO.write(image, "jpeg", response.getOutputStream());
-			response.getOutputStream().flush();
+			// 将图片转换为base64编码
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ImageIO.write(image, "jpeg", baos);
+			byte[] imageBytes = baos.toByteArray();
+			String imageBase64 = Base64.getEncoder().encodeToString(imageBytes);
+			
+			// 返回验证码图片base64编码和唯一标识
+			ResultMap result = resultMap.success();
+			result.put("captchaId", captchaId);
+			result.put("image", "data:image/jpeg;base64," + imageBase64);
+			
+			return result;
 		} catch (IOException e) {
 			logger.error("生成验证码失败", e);
+			return resultMap.fail().message("生成验证码失败");
 		}
 	}
 
@@ -148,44 +167,50 @@ public class LoginController {
 	 * @param username 用户名
 	 * @param password 密码
 	 * @param captcha 验证码
-	 * @param request HttpServletRequest
+	 * @param captchaId 验证码唯一标识
 	 * @return ResultMap<BR>
 	 */
 	@RequestMapping(value = "/login")
 	@ResponseBody
-	public ResultMap login(String username, String password, String captcha, HttpServletRequest request) {
+	public ResultMap login(String username, String password, String captcha, String captchaId) {
 		// 验证验证码
-		HttpSession session = request.getSession();
-		String sessionCaptcha = (String) session.getAttribute("captcha");
-		Long captchaTime = (Long) session.getAttribute("captchaTime");
-		
-		// 检查验证码是否存在
-		if (sessionCaptcha == null || captchaTime == null) {
-			return resultMap.fail().message("验证码已过期，请刷新后重试");
+		if (captchaId == null || captchaId.trim().isEmpty()) {
+			return resultMap.fail().message("验证码标识不能为空");
 		}
 		
-		// 检查验证码是否过期（5分钟）
-		long currentTime = System.currentTimeMillis();
-		if (currentTime - captchaTime > 5 * 60 * 1000) {
-			session.removeAttribute("captcha");
-			session.removeAttribute("captchaTime");
+		String captchaKey = CAPTCHA_KEY_PREFIX + captchaId;
+		String storedCaptcha = stringRedisTemplate.opsForValue().get(captchaKey);
+		
+		// 检查验证码是否存在
+		if (storedCaptcha == null) {
 			return resultMap.fail().message("验证码已过期，请刷新后重试");
 		}
 		
 		// 验证验证码（不区分大小写）
-		if (captcha == null || !sessionCaptcha.equalsIgnoreCase(captcha.trim())) {
+		if (captcha == null || !storedCaptcha.equalsIgnoreCase(captcha.trim())) {
 			// 验证失败后清除验证码，需要重新获取
-			session.removeAttribute("captcha");
-			session.removeAttribute("captchaTime");
+			stringRedisTemplate.delete(captchaKey);
 			return resultMap.fail().message("验证码错误");
 		}
 		
-		// 验证码正确，清除Session中的验证码（一次性使用）
-		session.removeAttribute("captcha");
-		session.removeAttribute("captchaTime");
+		// 验证码正确，清除Redis中的验证码（一次性使用）
+		stringRedisTemplate.delete(captchaKey);
 		
 		// 执行登录逻辑
-		return userService.login(username, password);
+		ResultMap loginResult = userService.login(username, password);
+		
+		// 如果登录成功，生成JWT Token并返回
+		if ("success".equals(loginResult.get("result"))) {
+			// 生成JWT Token
+			String token = jwtUtil.generateToken(username);
+			// 创建新的ResultMap，避免修改共享的resultMap导致并发问题
+			ResultMap response = new ResultMap();
+			response.putAll(loginResult);
+			response.put("token", token);
+			return response;
+		}
+		
+		return loginResult;
 	}
 
 	/**
@@ -214,7 +239,7 @@ public class LoginController {
 	 */
 	@RequestMapping(value = "/sendEmailCode", method = RequestMethod.POST)
 	@ResponseBody
-	public ResultMap sendEmailCode(String email, HttpServletRequest request) {
+	public ResultMap sendEmailCode(String email) {
 		logger.info("发送验证码请求: email={}", email);
 		
 		// 验证邮箱格式
@@ -237,25 +262,12 @@ public class LoginController {
 		}
 		
 		// 发送验证码
-		HttpSession session = request.getSession();
-		boolean sendSuccess = emailCodeService.sendCode(email.trim(), session);
+		boolean sendSuccess = emailCodeService.sendCode(email.trim());
 		
 		if (sendSuccess) {
 			logger.info("验证码发送成功: email={}", email);
 			return resultMap.success().message("验证码已发送");
 		} else {
-			// 检查是否是发送间隔限制
-			String sendTimeKey = "email_send_time_" + email.trim();
-			Long lastSendTime = (Long) session.getAttribute(sendTimeKey);
-			if (lastSendTime != null) {
-				long currentTime = System.currentTimeMillis();
-				long timeSinceLastSend = currentTime - lastSendTime;
-				if (timeSinceLastSend < 60 * 1000) {
-					long remainingSeconds = (60 * 1000 - timeSinceLastSend) / 1000;
-					logger.warn("验证码发送过于频繁: email={}, 还需等待{}秒", email, remainingSeconds);
-					return resultMap.fail().message("验证码发送过于频繁，请" + remainingSeconds + "秒后再试");
-				}
-			}
 			logger.error("验证码发送失败: email={}", email);
 			return resultMap.fail().message("验证码发送失败，请稍后重试");
 		}
@@ -266,7 +278,7 @@ public class LoginController {
 	 */
 	@RequestMapping(value = "/doRegist", method = RequestMethod.POST)
 	@ResponseBody
-	public ResultMap doRegist(String username, String name, String phone, String email, String password, String password2, String emailCode, HttpServletRequest request) {
+	public ResultMap doRegist(String username, String name, String phone, String email, String password, String password2, String emailCode) {
 		logger.info("注册请求接收: username={}, name={}, phone={}, email={}, password长度={}", 
 				username, name, phone, email, password != null ? password.length() : 0);
 		
@@ -321,8 +333,7 @@ public class LoginController {
 			return resultMap.fail().message("请输入邮箱验证码");
 		}
 		
-		HttpSession session = request.getSession();
-		String verifyResult = emailCodeService.verifyCode(email.trim(), emailCode.trim(), session);
+		String verifyResult = emailCodeService.verifyCode(email.trim(), emailCode.trim());
 		if (verifyResult != null) {
 			logger.warn("注册失败: 邮箱验证码验证失败, email={}, error={}", email, verifyResult);
 			return resultMap.fail().message(verifyResult);
@@ -365,7 +376,7 @@ public class LoginController {
 			userService.save(user);
 			
 			// 注册成功后清除验证码
-			emailCodeService.clearCode(email.trim(), session);
+			emailCodeService.clearCode(email.trim());
 			
 			logger.info("用户注册成功: username={}, name={}, phone={}, email={}, id={}, role={}", 
 					user.getUsername(), user.getName(), user.getPhone(), user.getEmail(), user.getId(), user.getRole());
@@ -455,7 +466,7 @@ public class LoginController {
 	 */
 	@RequestMapping(value = "/sendResetPasswordCode", method = RequestMethod.POST)
 	@ResponseBody
-	public ResultMap sendResetPasswordCode(String email, HttpServletRequest request) {
+	public ResultMap sendResetPasswordCode(String email) {
 		logger.info("发送找回密码验证码请求: email={}", email);
 		
 		// 验证邮箱格式
@@ -478,25 +489,12 @@ public class LoginController {
 		}
 		
 		// 发送验证码
-		HttpSession session = request.getSession();
-		boolean sendSuccess = emailCodeService.sendCode(email.trim(), session);
+		boolean sendSuccess = emailCodeService.sendCode(email.trim());
 		
 		if (sendSuccess) {
 			logger.info("找回密码验证码发送成功: email={}", email);
 			return resultMap.success().message("验证码已发送");
 		} else {
-			// 检查是否是发送间隔限制
-			String sendTimeKey = "email_send_time_" + email.trim();
-			Long lastSendTime = (Long) session.getAttribute(sendTimeKey);
-			if (lastSendTime != null) {
-				long currentTime = System.currentTimeMillis();
-				long timeSinceLastSend = currentTime - lastSendTime;
-				if (timeSinceLastSend < 60 * 1000) {
-					long remainingSeconds = (60 * 1000 - timeSinceLastSend) / 1000;
-					logger.warn("找回密码验证码发送过于频繁: email={}, 还需等待{}秒", email, remainingSeconds);
-					return resultMap.fail().message("验证码发送过于频繁，请" + remainingSeconds + "秒后再试");
-				}
-			}
 			logger.error("找回密码验证码发送失败: email={}", email);
 			return resultMap.fail().message("验证码发送失败，请稍后重试");
 		}
@@ -507,7 +505,7 @@ public class LoginController {
 	 */
 	@RequestMapping(value = "/resetPassword", method = RequestMethod.POST)
 	@ResponseBody
-	public ResultMap resetPassword(String email, String emailCode, String newPassword, String newPassword2, HttpServletRequest request) {
+	public ResultMap resetPassword(String email, String emailCode, String newPassword, String newPassword2) {
 		logger.info("重置密码请求: email={}", email);
 		
 		// 参数验证和清理（去除前后空白字符，包括换行符）
@@ -555,8 +553,7 @@ public class LoginController {
 		}
 		
 		// 验证邮箱验证码
-		HttpSession session = request.getSession();
-		String verifyResult = emailCodeService.verifyCode(email, emailCode, session);
+		String verifyResult = emailCodeService.verifyCode(email, emailCode);
 		if (verifyResult != null) {
 			logger.warn("重置密码失败: 验证码验证失败, email={}, error={}", email, verifyResult);
 			return resultMap.fail().message(verifyResult);
@@ -576,7 +573,7 @@ public class LoginController {
 			
 			if ("SUCCESS".equalsIgnoreCase(updateResult)) {
 				// 清除验证码
-				emailCodeService.clearCode(email, session);
+				emailCodeService.clearCode(email);
 				logger.info("密码重置成功: email={}, userId={}", email, user.getId());
 				return resultMap.success().message("密码重置成功，请使用新密码登录");
 			} else {

@@ -71,11 +71,11 @@
               v-for="slot in timeSlots"
               :key="slot.timeSlot"
               class="time-slot-item"
-                :class="{
+              :class="{
                   'available': slot.canBook && !slot.isExpired,
                   'full': !slot.canBook && !slot.isExpired,
-                  'expired': slot.isExpired
-                }"
+                'expired': slot.isExpired
+              }"
             >
               <div class="time-slot-time">{{ slot.timeSlot }}</div>
               <div class="time-slot-info">

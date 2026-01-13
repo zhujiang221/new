@@ -1,16 +1,10 @@
 package com.phms.controller.user;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
-import com.phms.mapper.AppointmentTypeMapper;
-import com.phms.mapper.UserMapper;
 import com.phms.pojo.Appointment;
-import com.phms.pojo.AppointmentType;
-import com.phms.pojo.NotificationMessage;
 import com.phms.pojo.User;
 import com.phms.service.AppointmentService;
-import com.phms.service.NotificationMessageService;
-import com.phms.websocket.NotificationWebSocketHandler;
+import com.phms.utils.JwtUtil;
+import com.phms.mapper.UserMapper;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
@@ -22,8 +16,9 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
-import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -39,16 +34,11 @@ public class UserApplyController {
     private AppointmentService appointmentService;
 
     @Autowired
-    private NotificationMessageService notificationMessageService;
+    private JwtUtil jwtUtil;
 
-    @Resource
+    @Autowired
     private UserMapper userMapper;
 
-    @Resource
-    private AppointmentTypeMapper appointmentTypeMapper;
-
-    @Autowired(required = false)
-    private NotificationWebSocketHandler notificationWebSocketHandler;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
@@ -94,8 +84,49 @@ public class UserApplyController {
     @RequestMapping("/getAllByLimitDoctor")
     @ResponseBody
     public Object getAllByLimitBaoJie(Appointment appointment) {
+        // 获取当前登录用户（医生）
         Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        Object principal = subject.getPrincipal();
+
+        User user = null;
+        if (principal instanceof User) {
+            user = (User) principal;
+        } else {
+            // 兜底：从Authorization的Bearer Token中解析用户名再查库，避免principal为null导致NPE
+            try {
+                ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String authHeader = attrs.getRequest().getHeader("Authorization");
+                    if (authHeader != null && !authHeader.isEmpty()) {
+                        String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+                        String username = jwtUtil.getUsernameFromToken(token);
+                        if (username != null) {
+                            user = userMapper.getByUsername(username);
+                            logger.info("通过Token兜底获取用户信息成功，username: {}", username);
+                        } else {
+                            logger.error("通过Token解析用户名失败，authHeader前20: {}", authHeader.length() > 20 ? authHeader.substring(0, 20) + "..." : authHeader);
+                        }
+                    } else {
+                        logger.error("Authorization头为空，无法兜底获取用户信息");
+                    }
+                } else {
+                    logger.error("RequestContextHolder未获取到请求上下文，无法兜底获取用户信息");
+                }
+            } catch (Exception e) {
+                logger.error("兜底解析Token获取用户失败", e);
+            }
+        }
+
+        if (user == null) {
+            logger.error("当前会话未获取到有效用户对象，principal: {}", principal);
+            return "LGINOUT";
+        }
+
+        // 防御性编程：确保 appointment 不为 null，避免 NPE
+        if (appointment == null) {
+            appointment = new Appointment();
+        }
+
         // 设置医生ID，只查询预约给当前医生的记录
         appointment.setDoctorId(user.getId());
         return appointmentService.getAllByLimit(appointment);
@@ -173,7 +204,7 @@ public class UserApplyController {
 
             // 设置预约信息
             appointment.setCreateTime(new Date());
-            // 状态:1申请中,2已到场就诊,3未到场就诊,4已完成
+            // 状态:1申请中,2申请通过,3不通过,4已完成
             appointment.setStatus(1);
             
             // 使用带行锁的方法添加预约（原子操作，防止并发超售）
@@ -182,14 +213,6 @@ public class UserApplyController {
             if (!success) {
                 // 在锁定检查时发现已满（可能被其他用户抢先预约）
                 return "FULL";
-            }
-            
-            // 预约成功后，创建消息通知医生
-            try {
-                createNotificationMessage(appointment);
-            } catch (Exception e) {
-                // 消息创建失败不影响预约成功，只记录日志
-                logger.error("创建预约消息失败", e);
             }
             
             return "SUCCESS";
@@ -249,88 +272,6 @@ public class UserApplyController {
         } catch (Exception e) {
             logger.error("获取可用时间段失败 - doctorId: {}, appDate: {}", doctorId, appDate, e);
             return "ERROR";
-        }
-    }
-
-    /**
-     * 创建预约消息通知
-     */
-    private void createNotificationMessage(Appointment appointment) {
-        try {
-            // 检查预约ID是否已生成
-            if (appointment.getId() == null) {
-                logger.error("创建预约消息失败：预约ID为空，预约可能未成功插入数据库");
-                return;
-            }
-            
-            // 检查必要的字段
-            if (appointment.getDoctorId() == null) {
-                logger.error("创建预约消息失败：医生ID为空");
-                return;
-            }
-            if (appointment.getUserId() == null) {
-                logger.error("创建预约消息失败：用户ID为空");
-                return;
-            }
-            
-            logger.info("开始创建预约消息通知 - 预约ID: {}, 医生ID: {}, 用户ID: {}", 
-                appointment.getId(), appointment.getDoctorId(), appointment.getUserId());
-            
-            // 获取用户信息
-            User sender = userMapper.selectByPrimaryKey(appointment.getUserId());
-            String userName = sender != null ? (sender.getName() != null ? sender.getName() : sender.getUsername()) : "用户";
-            
-            // 获取预约类型信息
-            AppointmentType appointmentType = appointmentTypeMapper.selectByPrimaryKey(appointment.getAppointmentTypeId());
-            String appointmentTypeName = appointmentType != null ? appointmentType.getName() : "预约";
-            
-            // 格式化预约时间
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            String appDate = sdf.format(appointment.getAppTime());
-            String timeSlot = appointment.getTimeSlot() != null ? appointment.getTimeSlot() : "";
-            
-            // 构建消息内容（JSON格式）
-            JSONObject contentJson = new JSONObject();
-            contentJson.put("userName", userName);
-            contentJson.put("appDate", appDate);
-            contentJson.put("timeSlot", timeSlot);
-            contentJson.put("appointmentTypeName", appointmentTypeName);
-            contentJson.put("info", appointment.getInfo());
-            
-            // 创建消息记录
-            NotificationMessage message = new NotificationMessage();
-            message.setReceiverId(appointment.getDoctorId());
-            message.setSenderId(appointment.getUserId());
-            message.setAppointmentId(appointment.getId());
-            // type字段存储预约类型ID（1=看病, 2=疫苗注射, 3=洗澡, 4=修毛等）
-            // 这样可以直接通过type字段知道是哪种预约类型
-            message.setType(String.valueOf(appointment.getAppointmentTypeId()));
-            message.setTitle("新预约通知");
-            message.setContent(contentJson.toJSONString());
-            message.setIsRead(0);
-            message.setCreateTime(new Date());
-            
-            // 保存消息到数据库
-            notificationMessageService.createMessage(message);
-            logger.info("预约消息已保存到数据库 - 消息ID: {}, 接收者ID: {}", 
-                message.getId(), message.getReceiverId());
-            
-            // 尝试通过WebSocket推送消息（如果医生在线）
-            if (notificationWebSocketHandler != null) {
-                try {
-                    notificationWebSocketHandler.sendMessageToUser(
-                        appointment.getDoctorId(),
-                        JSON.toJSONString(message)
-                    );
-                    logger.info("已通过WebSocket推送消息给医生 - 医生ID: {}", appointment.getDoctorId());
-                } catch (Exception wsException) {
-                    logger.warn("WebSocket推送消息失败，但不影响消息保存", wsException);
-                }
-            }
-        } catch (Exception e) {
-            logger.error("创建预约消息异常 - 预约ID: {}, 医生ID: {}, 用户ID: {}", 
-                appointment.getId(), appointment.getDoctorId(), appointment.getUserId(), e);
-            throw e;
         }
     }
 }

@@ -4,8 +4,7 @@ import com.phms.pojo.Medicine;
 import com.phms.pojo.User;
 import com.phms.service.MedicineService;
 import com.phms.service.UserService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +28,9 @@ public class MedicineController {
     private MedicineService medicineService;
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private UserContext userContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -57,8 +59,11 @@ public class MedicineController {
     @ResponseBody
     @Transactional
     public String doAdd(Medicine medicine) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)
         if (user == null) {
@@ -95,8 +100,11 @@ public class MedicineController {
     @ResponseBody
     @Transactional
     public String update(Medicine medicine) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)
         if (user == null) {
@@ -127,8 +135,11 @@ public class MedicineController {
     @ResponseBody
     @Transactional
     public String del(Long id) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)
         if (user == null) {

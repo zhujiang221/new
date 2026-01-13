@@ -3,8 +3,7 @@ package com.phms.controller.user;
 import com.phms.pojo.DoctorServiceType;
 import com.phms.pojo.User;
 import com.phms.service.DoctorServiceTypeService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +25,9 @@ import java.util.List;
 public class DoctorServiceTypeController {
     @Autowired
     private DoctorServiceTypeService doctorServiceTypeService;
+    
+    @Autowired
+    private UserContext UserContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -35,8 +37,11 @@ public class DoctorServiceTypeController {
     @RequestMapping("/list")
     @ResponseBody
     public Object getServiceTypes(Long doctorId) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         // 如果不是管理员，只能看自己的
         if (user.getRole() != 1 && doctorId == null) {
@@ -62,8 +67,11 @@ public class DoctorServiceTypeController {
     @Transactional
     public String setServiceTypes(@RequestParam(required = false) Long doctorId, 
                                    @RequestParam(required = false) Long[] typeIds) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = UserContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "NOT_LOGIN";
+        }
         
         if (user == null) {
             logger.warn("设置服务类型失败：用户未登录");

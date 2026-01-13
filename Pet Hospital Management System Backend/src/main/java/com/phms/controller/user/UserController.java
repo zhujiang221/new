@@ -3,10 +3,12 @@ package com.phms.controller.user;
 import com.phms.model.ResultMap;
 import com.phms.pojo.User;
 import com.phms.service.UserService;
+import com.phms.utils.UserContext;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -22,7 +24,10 @@ public class UserController {
     private final ResultMap resultMap;
     
     private final UserService userService;
-
+    
+    @Autowired
+    private UserContext userContext;
+    
     public UserController(ResultMap resultMap, UserService userService) {
         this.resultMap = resultMap;
         this.userService = userService;
@@ -89,31 +94,34 @@ public class UserController {
     @RequestMapping("/getCurrentUser")
     public ResultMap getCurrentUser() {
         try {
-            Subject subject = SecurityUtils.getSubject();
-            User user = (User) subject.getPrincipal();
+            User user = userContext.getCurrentUser();
             if (user == null) {
                 return resultMap.fail().message("用户未登录");
             }
             
+            // 创建新的ResultMap，避免修改共享的resultMap导致并发问题
+            ResultMap response = new ResultMap();
+            response.put("result", "success");
+            
             // 获取用户角色（从user表的role字段获取）
-            Integer roleId = userService.getUserRoleId(user.getId());
+            Integer roleId = user.getRole();
             if (roleId == null) {
                 roleId = 3; // 默认普通用户
             }
             
-            // 构建返回数据，直接添加到ResultMap中
-            resultMap.put("id", user.getId());
-            // 使用username字段，如果为空则使用phone作为fallback
-            resultMap.put("username", user.getUsername() != null && !user.getUsername().trim().isEmpty() 
+            // 构建返回数据
+            response.put("id", user.getId());
+            response.put("username", user.getUsername() != null && !user.getUsername().trim().isEmpty() 
                 ? user.getUsername() 
                 : (user.getPhone() != null ? user.getPhone() : String.valueOf(user.getId())));
-            resultMap.put("name", user.getName());
-            resultMap.put("phone", user.getPhone());
-            resultMap.put("email", user.getEmail());
-            resultMap.put("address", user.getAddress());
-            resultMap.put("roleId", roleId);
+            response.put("name", user.getName());
+            response.put("phone", user.getPhone());
+            response.put("email", user.getEmail());
+            response.put("address", user.getAddress());
+            response.put("role", roleId); // 使用role字段，与前端保持一致
+            response.put("roleId", roleId); // 兼容旧代码
             
-            return resultMap.success();
+            return response;
         } catch (Exception e) {
             logger.error("获取当前用户信息失败", e);
             return resultMap.fail().message("获取用户信息失败");

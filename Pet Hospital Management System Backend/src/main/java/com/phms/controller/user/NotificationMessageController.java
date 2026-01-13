@@ -3,8 +3,7 @@ package com.phms.controller.user;
 import com.phms.pojo.NotificationMessage;
 import com.phms.pojo.User;
 import com.phms.service.NotificationMessageService;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
+import com.phms.utils.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +22,9 @@ import java.util.List;
 public class NotificationMessageController {
     @Autowired
     private NotificationMessageService notificationMessageService;
+    
+    @Autowired
+    private UserContext userContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
@@ -33,8 +35,7 @@ public class NotificationMessageController {
     @ResponseBody
     public Object getMessageList(NotificationMessage notificationMessage) {
         try {
-            Subject subject = SecurityUtils.getSubject();
-            User user = (User) subject.getPrincipal();
+            User user = userContext.getCurrentUser();
             if (user == null) {
                 return "NOT_LOGIN";
             }
@@ -61,8 +62,7 @@ public class NotificationMessageController {
     @ResponseBody
     public Object getUnreadCount() {
         try {
-            Subject subject = SecurityUtils.getSubject();
-            User user = (User) subject.getPrincipal();
+            User user = userContext.getCurrentUser();
             if (user == null) {
                 return 0;
             }
@@ -81,8 +81,7 @@ public class NotificationMessageController {
     @ResponseBody
     public String markAsRead(@RequestParam(required = false) List<Long> ids) {
         try {
-            Subject subject = SecurityUtils.getSubject();
-            User user = (User) subject.getPrincipal();
+            User user = userContext.getCurrentUser();
             if (user == null) {
                 return "NOT_LOGIN";
             }
@@ -101,8 +100,7 @@ public class NotificationMessageController {
     @ResponseBody
     public Object checkOnLogin() {
         try {
-            Subject subject = SecurityUtils.getSubject();
-            User user = (User) subject.getPrincipal();
+            User user = userContext.getCurrentUser();
             if (user == null) {
                 return "NOT_LOGIN";
             }

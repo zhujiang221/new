@@ -63,10 +63,6 @@
           </div>
           
           <div class="apply-details">
-            <div v-if="item.petName" class="apply-detail-item">
-              <span class="detail-icon">🐾</span>
-              <span class="detail-text">宠物: {{ item.petName }}</span>
-            </div>
             <div v-if="item.doctorName" class="apply-detail-item">
               <span class="detail-icon">👨‍⚕️</span>
               <span class="detail-text">医生: {{ item.doctorName }}</span>
@@ -202,7 +198,6 @@ interface Apply {
   timeSlot?: string;
   createTime?: string;
   doctorName?: string;
-  petName?: string;
   status: number;
 }
 

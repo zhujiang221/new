@@ -5,6 +5,7 @@ import com.phms.pojo.PetDaily;
 import com.phms.pojo.User;
 import com.phms.service.PetDailyService;
 import com.phms.service.PetService;
+import com.phms.utils.UserContext;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
@@ -28,6 +29,9 @@ public class UserPetController {
     private PetService petService;
     @Autowired
     private PetDailyService petDailyService;
+    
+    @Autowired
+    private UserContext userContext;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
@@ -53,8 +57,11 @@ public class UserPetController {
     @RequestMapping("/getAllByLimit")
     @ResponseBody
     public Object getAllByLimit(Pet pojo) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            throw new RuntimeException("用户未登录");
+        }
         pojo.setUserId(user.getId());
         return petService.getAllByLimit(pojo);
     }
@@ -119,8 +126,11 @@ public class UserPetController {
     @ResponseBody
     @Transactional
     public String doAdd(Pet pojo) {
-        Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        User user = userContext.getCurrentUser();
+        if (user == null) {
+            logger.error("获取当前用户失败，用户未登录");
+            return "ERROR";
+        }
         try {
             pojo.setUserId(user.getId());
             pojo.setCreateTime(new Date());

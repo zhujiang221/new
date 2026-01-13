@@ -4,6 +4,8 @@
  * role: 1=管理员, 2=医生, 3=用户
  */
 
+import { removeToken } from './token';
+
 export interface UserInfo {
   id: string;
   username: string;
@@ -196,10 +198,10 @@ function normalizeRole(role: any): number {
 }
 
 /**
- * 清除用户信息
- * 如果提供了用户ID和角色，只清除该用户的信息；否则清除所有用户信息
+ * 清除用户信息（不清除Token）
+ * 用于用户切换时，只清除旧的用户信息，但保留Token以便后续请求
  */
-export function clearUserInfo(userId?: string, role?: number) {
+export function clearUserInfoOnly(userId?: string, role?: number) {
   const hostname = window.location.hostname;
   
   if (userId && role !== undefined) {
@@ -207,9 +209,9 @@ export function clearUserInfo(userId?: string, role?: number) {
     const USER_INFO_KEY = getUserInfoKey(userId, role);
     localStorage.removeItem(USER_INFO_KEY);
     sessionStorage.removeItem(USER_INFO_KEY);
-    console.log('清除用户信息，主机名:', hostname, '用户ID:', userId, '角色:', role);
+    console.log('清除用户信息（保留Token），主机名:', hostname, '用户ID:', userId, '角色:', role);
   } else {
-    // 清除所有用户信息（用于退出登录）
+    // 清除所有用户信息（但不清除Token）
     const keys = getAllUserInfoKeys();
     keys.forEach(key => {
       localStorage.removeItem(key);
@@ -229,8 +231,23 @@ export function clearUserInfo(userId?: string, role?: number) {
     localStorage.removeItem(oldKey2);
     sessionStorage.removeItem(oldKey2);
     
-    console.log('清除所有用户信息，主机名:', hostname);
+    console.log('清除所有用户信息（保留Token），主机名:', hostname);
   }
+}
+
+/**
+ * 清除用户信息
+ * 如果提供了用户ID和角色，只清除该用户的信息；否则清除所有用户信息
+ * 注意：此函数会同时清除Token，用于退出登录场景
+ */
+export function clearUserInfo(userId?: string, role?: number) {
+  const hostname = window.location.hostname;
+  
+  // 清除Token（退出登录时需要）
+  removeToken();
+  
+  // 清除用户信息
+  clearUserInfoOnly(userId, role);
 }
 
 /**

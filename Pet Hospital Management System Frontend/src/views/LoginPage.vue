@@ -115,7 +115,7 @@
             注册
           </el-button>
           <el-button
-            type="text"
+            link
             class="btn-forget-password"
             @click="goForgetPassword"
             :style="{ color: '#67c23a', padding: 0 }"
@@ -134,6 +134,7 @@ import { useRouter } from 'vue-router';
 import http from '../api/http';
 import { saveUserInfo, type UserInfo, ROLE_ADMIN, ROLE_DOCTOR, ROLE_USER } from '../utils/user';
 import { getCurrentUserInfo } from '../api/user';
+import { setToken, getToken } from '../utils/token';
 import type { FormInstance } from 'element-plus';
 import { showMessage } from '../utils/message';
 
@@ -290,17 +291,27 @@ const errors = reactive({
 
 const loading = ref(false);
 const captchaImageUrl = ref('');
-
-// 生成验证码URL（添加时间戳防止缓存）
-function getCaptchaUrl() {
-  return `/captcha?t=${Date.now()}`;
-}
+const captchaId = ref('');
 
 // 刷新验证码
-function refreshCaptcha() {
-  captchaImageUrl.value = getCaptchaUrl();
-  form.captcha = '';
-  clearError('captcha');
+async function refreshCaptcha() {
+  try {
+    const resp = await http.get('/captcha');
+    const data = resp.data;
+    
+    if (data.result === 'success' && data.captchaId && data.image) {
+      captchaId.value = data.captchaId;
+      captchaImageUrl.value = data.image; // base64编码的图片
+      form.captcha = '';
+      clearError('captcha');
+    } else {
+      console.error('获取验证码失败:', data.message);
+      showMessage('获取验证码失败，请刷新页面重试', 'error');
+    }
+  } catch (e) {
+    console.error('获取验证码异常:', e);
+    showMessage('获取验证码失败，请刷新页面重试', 'error');
+  }
 }
 
 // 处理验证码图片加载错误
@@ -369,12 +380,20 @@ function validate(): boolean {
 async function handleSubmit() {
   if (!validate()) return;
   
+  // 检查验证码ID是否存在
+  if (!captchaId.value) {
+    showMessage('验证码已过期，请刷新验证码', 'error');
+    await refreshCaptcha();
+    return;
+  }
+  
   loading.value = true;
   try {
     const resp = await http.post('/login', {
       username: form.username,
       password: form.password,
-      captcha: form.captcha.trim()
+      captcha: form.captcha.trim(),
+      captchaId: captchaId.value
     });
     const data = resp.data;
     
@@ -385,6 +404,22 @@ async function handleSubmit() {
       let role: any = null;
       let userId: string | null = null;
       let userName = form.username;
+      
+      // 先保存Token，确保后续API请求能携带token
+      const token = data.token || data.data?.token;
+      if (token) {
+        console.log('保存Token:', token.substring(0, 20) + '...');
+        setToken(token);
+        // 验证token是否保存成功
+        const savedToken = getToken();
+        if (savedToken) {
+          console.log('Token保存成功，已保存的Token:', savedToken.substring(0, 20) + '...');
+        } else {
+          console.error('Token保存失败！');
+        }
+      } else {
+        console.warn('登录响应中没有找到token字段，响应数据:', data);
+      }
       
       // 检查登录响应中是否包含用户信息
       if (data.data) {
@@ -397,13 +432,18 @@ async function handleSubmit() {
         userName = data.name || data.username || form.username;
       }
       
-      // 如果登录响应中没有角色信息，尝试获取用户信息
+      // 如果登录响应中没有角色信息，尝试获取用户信息（此时token已经保存）
       if (role === null || role === undefined) {
-        const userInfo = await getCurrentUserInfo();
-        if (userInfo) {
-          role = userInfo.role;
-          userId = userInfo.id;
-          userName = userInfo.name || userName;
+        try {
+          const userInfo = await getCurrentUserInfo();
+          if (userInfo) {
+            role = userInfo.role;
+            userId = userInfo.id;
+            userName = userInfo.name || userName;
+          }
+        } catch (e) {
+          console.error('获取用户信息失败:', e);
+          // 如果获取用户信息失败，使用默认值
         }
       }
       
@@ -438,7 +478,7 @@ async function handleSubmit() {
       console.log('角色比较 - roleNum === ROLE_DOCTOR:', roleNum === ROLE_DOCTOR);
       console.log('角色比较 - roleNum === ROLE_USER:', roleNum === ROLE_USER);
       
-      // 保存用户信息到sessionStorage
+      // 保存用户信息到localStorage
       const userInfo: UserInfo = {
         id: userId || '',
         username: userName,
@@ -447,17 +487,24 @@ async function handleSubmit() {
       };
       saveUserInfo(userInfo);
       
+      // 检测是否为移动端
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                       (window.innerWidth <= 768);
+      
       // 根据角色跳转到不同的首页
+      // Layout组件会根据设备类型自动显示移动端或桌面端布局
       // role: 1=管理员, 2=医生, 3=用户
       if (roleNum === ROLE_ADMIN) {
-        console.log('跳转到管理员页面');
-        router.push('/admin/users'); // 管理员保持不变
+        console.log('跳转到管理员页面', isMobile ? '(移动端)' : '(桌面端)');
+        router.push('/admin/users'); // 管理员主页（Layout会自动适配移动端）
       } else if (roleNum === ROLE_DOCTOR) {
-        console.log('跳转到医生页面');
-        router.push('/doctor'); // 跳转到医生主页面
+        console.log('跳转到医生页面', isMobile ? '(移动端)' : '(桌面端)');
+        // 移动端直接跳转到 /doctor 显示主页，电脑端会在DoctorLayout中重定向到 /doctor/apply
+        router.push('/doctor');
       } else {
-        console.log('跳转到用户页面');
-        router.push('/user'); // 跳转到用户主页面
+        console.log('跳转到用户页面', isMobile ? '(移动端)' : '(桌面端)');
+        // 移动端直接跳转到 /user 显示主页，电脑端会在UserLayout中重定向到 /user/pets
+        router.push('/user');
       }
     } else {
       // 处理各种错误情况
