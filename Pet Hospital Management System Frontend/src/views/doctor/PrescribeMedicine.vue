@@ -206,7 +206,8 @@ async function submitPrescription() {
 }
 
 function goBack() {
-  router.back();
+  // 直接返回到宠物健康史页面
+  router.push('/doctor/diagnosis');
 }
 </script>
 

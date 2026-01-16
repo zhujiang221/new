@@ -309,16 +309,29 @@ const passwordRules: FormRules = {
 // 管理员菜单组（MainLayout只用于管理员）
 const menuGroups: MenuGroup[] = [
   {
-    title: '系统管理',
-    icon: '⚙️',
+    title: '用户管理',
+    icon: '👤',
+    role: String(ROLE_ADMIN),
     items: [
       { label: '用户管理', path: '/admin/users' },
-      { label: '预约类型管理', path: '/admin/appointment-type' }
+      { label: '医生空闲时间', path: '/admin/free-time' },
+      { label: '排班管理', path: '/admin/schedule' },
+      { label: '服务类型管理', path: '/admin/service-type' }
+    ]
+  },
+  {
+    title: '消息管理',
+    icon: '💬',
+    role: String(ROLE_ADMIN),
+    items: [
+      { label: '聊天管理', path: '/admin/chat' },
+      { label: '发送全局通知', path: '/admin/broadcast' }
     ]
   },
   {
     title: '宠物管理',
     icon: '🐾',
+    role: String(ROLE_ADMIN),
     items: [
       { label: '宠物列表', path: '/admin/pets' },
       { label: '诊断记录', path: '/admin/diagnosis' }
@@ -327,16 +340,16 @@ const menuGroups: MenuGroup[] = [
   {
     title: '预约管理',
     icon: '📅',
+    role: String(ROLE_ADMIN),
     items: [
       { label: '预约列表', path: '/admin/apply' },
-      { label: '医生空闲时间', path: '/admin/free-time' },
-      { label: '排班管理', path: '/admin/schedule' },
-      { label: '服务类型管理', path: '/admin/service-type' }
+      { label: '预约类型管理', path: '/admin/appointment-type' }
     ]
   },
   {
     title: '日常健康',
     icon: '❤️',
+    role: String(ROLE_ADMIN),
     items: [
       { label: '健康指南', path: '/admin/notices' },
       { label: '健康评估', path: '/admin/assess' },
@@ -346,6 +359,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: '宠物档案',
     icon: '📊',
+    role: String(ROLE_ADMIN),
     items: [
       { label: '宠物日志', path: '/admin/pet-daily' },
       { label: '预约统计', path: '/admin/tj-apply' },
@@ -355,6 +369,7 @@ const menuGroups: MenuGroup[] = [
   {
     title: '药品管理',
     icon: '💊',
+    role: String(ROLE_ADMIN),
     items: [
       { label: '药品列表', path: '/admin/medicine' },
       { label: '开药记录', path: '/admin/medicine-record' }
@@ -724,7 +739,10 @@ watch(() => route.path, (newPath) => {
 
 .top-bar {
   height: 51px;
-  background-color: #2b2b2b;
+  background-color: rgba(255, 255, 255, 1);
+  border-style: solid;
+  border-width: 1px;
+  border-color: rgba(224, 224, 224, 1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -839,6 +857,15 @@ watch(() => route.path, (newPath) => {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
+  box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.15);
+  transform: scaleX(-1);
+  background-clip: unset;
+  -webkit-background-clip: unset;
+  color: rgba(51, 51, 51, 1);
+  background-color: unset;
+  border-color: rgba(0, 0, 0, 0);
+  background: unset;
+  border-image: none;
 }
 
 .logo .title {
@@ -849,7 +876,7 @@ watch(() => route.path, (newPath) => {
 }
 
 .user-info {
-  color: white;
+  color: #333;
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -862,12 +889,12 @@ watch(() => route.path, (newPath) => {
 }
 
 .user-info .username {
-  color: #72C1BB;
+  color: rgba(0, 0, 0, 1);
   margin: 0 5px;
 }
 
 .dropdown-trigger {
-  color: #72C1BB;
+  color: rgba(0, 0, 0, 1);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -927,10 +954,11 @@ watch(() => route.path, (newPath) => {
 
 .left-menu {
   width: 180px;
-  background-color: #72C1BB;
+  background-color: rgba(255, 255, 255, 1);
   overflow-y: auto;
   flex-shrink: 0;
   transition: transform 0.3s ease, width 0.2s ease;
+  border-right: 1px solid rgba(224, 224, 224, 1);
 }
 
 .left-menu.collapsed {
@@ -994,12 +1022,12 @@ watch(() => route.path, (newPath) => {
 }
 
 .menu-group {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(224, 224, 224, 1);
 }
 
 .menu-title {
   padding: 12px 15px;
-  color: white;
+  color: #333;
   font-weight: bold;
   cursor: pointer;
   display: flex;
@@ -1009,11 +1037,12 @@ watch(() => route.path, (newPath) => {
 }
 
 .menu-title:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(114, 193, 187, 0.1);
 }
 
 .menu-title.active {
-  background-color: rgba(0, 0, 0, 0.15);
+  background-color: rgba(114, 193, 187, 0.15);
+  color: #72C1BB;
 }
 
 .arrow {
@@ -1024,24 +1053,27 @@ watch(() => route.path, (newPath) => {
   list-style: none;
   margin: 0;
   padding: 0;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: transparent;
 }
 
 .menu-list li {
   padding: 10px 15px 10px 25px;
-  color: white;
+  color: #333;
   cursor: pointer;
   transition: background-color 0.2s;
   font-size: 14px;
+  border-left: 3px solid transparent;
 }
 
 .menu-list li:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(114, 193, 187, 0.1);
 }
 
 .menu-list li.selected {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-left: 3px solid white;
+  background-color: rgba(114, 193, 187, 0.15);
+  color: #72C1BB;
+  border-left: 3px solid #72C1BB;
+  font-weight: 500;
 }
 
 .content-area {

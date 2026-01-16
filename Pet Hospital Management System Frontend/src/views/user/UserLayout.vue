@@ -12,27 +12,34 @@
         >
           <
         </button>
-        <button 
-          v-if="!isMobile" 
-          class="menu-toggle-desktop" 
-          @click="toggleCollapse"
-          :title="isCollapsed ? '展开导航栏' : '收起导航栏'"
-        >
-          <span class="toggle-icon" :class="{ 'collapsed': isCollapsed }">
-            <span class="line"></span>
-            <span class="line"></span>
-            <span class="line"></span>
-          </span>
-        </button>
         <img src="/imgs/catFace.png" alt="logo" />
-        <span class="title">
-          {{ isMobile && !showMainPageView ? (route.meta?.title as string || '详情') : '宠物医院管理系统' }}
-        </span>
+        <div class="title-wrapper">
+          <span class="title">
+            {{ isMobile && !showMainPageView ? (route.meta?.title as string || '详情') : '宠物医院管理系统' }}
+          </span>
+          <span v-if="!isMobile || (isMobile && !showMainPageView)" class="subtitle">用户端</span>
+        </div>
       </div>
       <div class="user-info" v-if="!isMobile">
-        <span class="username">{{ userInfo.name || '用户' }}</span>
-        <el-dropdown @command="handleCommand" trigger="click">
-          <span class="dropdown-trigger">▼</span>
+        <!-- 通知按钮 -->
+        <div class="notification-button" @click="goToMessage" title="通知">
+          <span class="notification-icon">🔔</span>
+          <span v-if="unreadMessageCount > 0" class="notification-badge">{{ unreadMessageCount > 99 ? '99+' : unreadMessageCount }}</span>
+        </div>
+        <!-- 聊天按钮 -->
+        <div class="help-button" @click="goToChat" title="聊天">
+          <span class="help-icon">💬</span>
+          <span v-if="chatUnreadCount > 0" class="chat-badge">
+            {{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}
+          </span>
+        </div>
+        <!-- 用户头像/信息 -->
+        <div class="user-avatar-button" @click="goToMine" title="用户主页">
+          <span class="user-avatar-icon">👤</span>
+        </div>
+        <!-- 下拉菜单 -->
+        <el-dropdown @command="handleCommand" trigger="click" placement="bottom-end">
+          <span style="display: none;"></span>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">修改个人信息</el-dropdown-item>
@@ -41,9 +48,24 @@
           </template>
         </el-dropdown>
       </div>
-      <!-- 移动端只显示用户名，不显示下拉菜单 -->
+      <!-- 移动端只显示用户名和通知按钮 -->
       <div class="user-info-mobile" v-if="isMobile">
-        <span class="username">{{ userInfo.name || '用户' }}</span>
+        <!-- 通知按钮 -->
+        <div class="notification-button-mobile" @click="goToMessage" title="通知">
+          <span class="notification-icon">🔔</span>
+          <span v-if="unreadMessageCount > 0" class="notification-dot"></span>
+        </div>
+        <!-- 聊天按钮 -->
+        <div class="chat-button-mobile" @click="goToChat" title="聊天">
+          <span class="chat-icon">💬</span>
+          <span v-if="chatUnreadCount > 0" class="chat-badge">
+            {{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}
+          </span>
+        </div>
+        <!-- 用户头像 -->
+        <div class="user-avatar-button-mobile" @click="goToMine" title="用户主页">
+          <span class="user-avatar-icon">👤</span>
+        </div>
       </div>
     </div>
 
@@ -51,79 +73,72 @@
       <!-- 电脑端左侧导航栏 -->
       <div 
         v-if="!isMobile"
-        class="left-menu" 
-        :class="{ 'collapsed': isCollapsed }"
+        class="left-menu"
       >
         <div
-          v-for="group in menuGroups"
-          :key="group.title"
-          class="menu-group"
+          v-for="item in menuItems"
+          :key="item.path"
+          class="menu-item"
+          :class="{ active: currentPath === item.path || (item.path === '/user' && currentPath === '/user') }"
+          @click="navigate(item.path)"
         >
-          <div
-            class="menu-title"
-            :class="{ active: expandedGroup === group.title }"
-            @click="toggleGroup(group.title)"
-          >
-            <span class="menu-icon" v-if="group.icon">{{ group.icon }}</span>
-            <span class="menu-text" v-show="!isCollapsed">{{ group.title }}</span>
-            <span class="arrow" v-show="!isCollapsed">{{ expandedGroup === group.title ? '▼' : '▶' }}</span>
-          </div>
-          <ul v-show="expandedGroup === group.title && !isCollapsed" class="menu-list">
-            <li
-              v-for="item in group.items"
-              :key="item.path"
-              :class="{ selected: currentPath === item.path }"
-              @click="navigate(item.path)"
-            >
-              {{ item.label }}
-            </li>
-          </ul>
+          <span class="menu-icon">{{ item.icon }}</span>
+          <span class="menu-text">{{ item.label }}</span>
         </div>
       </div>
 
-      <!-- 移动端底部导航栏（仅在主页面显示） -->
-      <div v-if="isMobile && showMainPageView" class="bottom-nav">
+      <!-- 移动端底部导航栏（在主页面相关路由下显示） -->
+      <div v-if="shouldShowBottomNav" class="bottom-nav">
         <div 
           class="nav-item" 
           :class="{ active: currentTab === 'home' }"
           @click="switchTab('home')"
         >
           <div class="nav-icon">🏠</div>
-          <div class="nav-label">主页</div>
+          <div class="nav-label">首页</div>
         </div>
         <div 
           class="nav-item" 
-          :class="{ active: currentTab === 'message' }"
-          @click="switchTab('message')"
+          :class="{ active: currentTab === 'pets' }"
+          @click="switchTab('pets')"
         >
-          <div class="nav-icon">💬</div>
-          <div class="nav-label">消息</div>
+          <div class="nav-icon">🐾</div>
+          <div class="nav-label">宠物管理</div>
         </div>
         <div 
           class="nav-item" 
-          :class="{ active: currentTab === 'mine' }"
-          @click="switchTab('mine')"
+          :class="{ active: currentTab === 'apply' }"
+          @click="switchTab('apply')"
         >
-          <div class="nav-icon">👤</div>
-          <div class="nav-label">我的</div>
+          <div class="nav-icon">📅</div>
+          <div class="nav-label">预约管理</div>
+        </div>
+        <div 
+          class="nav-item" 
+          :class="{ active: currentTab === 'monitor' }"
+          @click="switchTab('monitor')"
+        >
+          <div class="nav-icon">❤️</div>
+          <div class="nav-label">健康监测</div>
         </div>
       </div>
 
       <!-- 内容区域 -->
-      <div class="content-area" :class="{ 'with-bottom-nav': isMobile && showMainPageView }">
+      <div class="content-area" :class="{ 'with-bottom-nav': shouldShowBottomNav }">
         <!-- 移动端显示核心页面或路由内容 -->
         <template v-if="isMobile">
-          <!-- 如果在主页面（home/mine/more），显示对应的主页面组件 -->
+          <!-- 如果在主页面，显示对应的主页面组件 -->
           <template v-if="showMainPageView">
             <UserHome v-if="currentTab === 'home'" @navigate="handleChildNavigate" />
-            <UserMine v-else-if="currentTab === 'mine'" />
-            <UserMessage v-else-if="currentTab === 'message'" />
           </template>
           <!-- 如果在子路由页面，显示路由内容 -->
           <router-view v-else />
         </template>
-        <!-- 电脑端显示路由内容 -->
-        <router-view v-else />
+        <!-- 电脑端：如果是首页路径，显示主页组件，否则显示路由内容 -->
+        <template v-else>
+          <UserHome v-if="route.path === '/user'" @navigate="handleChildNavigate" />
+          <router-view v-else />
+        </template>
       </div>
     </div>
 
@@ -176,17 +191,17 @@ import http from '../../api/http';
 import { getUserInfo, clearUserInfo, clearUserInfoOnly, saveUserInfo, type UserInfo, ROLE_DOCTOR, ROLE_ADMIN, ROLE_USER, getDeviceId } from '../../utils/user';
 import { getCurrentUserInfo } from '../../api/user';
 import { showMessage, showConfirm } from '../../utils/message';
+import { getUnreadChatMessageCount } from '../../api/chat';
+import { websocketManager } from '../../utils/websocket';
 import UserHome from './UserHome.vue';
-import UserMine from './UserMine.vue';
-import UserMessage from './UserMessage.vue';
+import { useNotification } from '../../composables/useNotification';
 
 const router = useRouter();
 const route = useRoute();
 
-// 移动端检测 & 左侧导航折叠（默认展开）
+// 移动端检测
 const isMobile = ref(false);
-const isCollapsed = ref(false); // 默认展开
-const currentTab = ref<'home' | 'mine' | 'message'>('home');
+const currentTab = ref<'home' | 'pets' | 'apply' | 'monitor'>('home');
 
 // 用于跟踪是否应该显示主页面视图（而不是路由视图）
 // true: 显示主页面组件（UserHome/UserMine/UserMore）
@@ -197,29 +212,117 @@ function checkMobile() {
   isMobile.value = window.innerWidth < 768;
 }
 
-function toggleCollapse() {
-  isCollapsed.value = !isCollapsed.value;
-}
-
 // 返回按钮点击事件
 function goBack() {
-  // 返回主页的home tab
+  const currentPath = route.path;
+  
+  // 定义路由的层级关系：子路由 -> 父路由
+  const routeHierarchy: Record<string, string> = {
+    // 预约相关
+    '/user/apply-flow': '/user/apply',  // 预约就诊 -> 我的预约
+    // 宠物相关
+    '/user/pet-detail': '/user/pets',   // 宠物详情 -> 宠物管理
+    '/user/pet-edit': '/user/pets',     // 编辑宠物 -> 宠物管理
+    '/user/pet-add': '/user/pets',      // 添加宠物 -> 宠物管理
+    // 可以继续添加其他路由关系
+  };
+  
+  // 检查是否有明确的父路由
+  if (routeHierarchy[currentPath]) {
+    const parentPath = routeHierarchy[currentPath];
+    // 检查父路由是否是主页面相关路由
+    if (parentPath === '/user' || parentPath === '/user/pets' || 
+        parentPath === '/user/apply' || parentPath === '/user/assess') {
+      // 设置对应的tab
+      if (parentPath === '/user') {
   currentTab.value = 'home';
-  isTabNavigation.value = true; // 设置标志，表示这是返回操作
   showMainPageView.value = true;
-  router.push('/user').catch(() => {
+      } else if (parentPath === '/user/pets') {
+        currentTab.value = 'pets';
+        showMainPageView.value = false;
+      } else if (parentPath === '/user/apply') {
+        currentTab.value = 'apply';
+        showMainPageView.value = false;
+      } else if (parentPath === '/user/assess') {
+        currentTab.value = 'monitor';
+        showMainPageView.value = false;
+      }
+      isTabNavigation.value = true;
+      router.push(parentPath).catch(() => {
     // 忽略导航重复的错误
   });
+      return;
+    }
+  }
+  
+  // 如果没有明确的父路由，尝试从路径推断
+  // 处理特殊的路由模式，如 /user/apply-flow -> /user/apply
+  if (currentPath.startsWith('/user/')) {
+    const pathParts = currentPath.split('/').filter(p => p);
+    
+    // 处理带后缀的路由，如 apply-flow, pet-detail 等
+    if (pathParts.length === 3 && pathParts[0] === 'user') {
+      const secondPart = pathParts[1];
+      const thirdPart = pathParts[2];
+      
+      // 如果是 apply-flow，返回到 apply
+      if (secondPart === 'apply' && thirdPart === 'flow') {
+        currentTab.value = 'apply';
+        showMainPageView.value = false;
+        isTabNavigation.value = true;
+        router.push('/user/apply').catch(() => {});
+        return;
+      }
+      
+      // 如果是 pets 相关的子路由，返回到 pets
+      if (secondPart === 'pets') {
+        currentTab.value = 'pets';
+        showMainPageView.value = false;
+        isTabNavigation.value = true;
+        router.push('/user/pets').catch(() => {});
+        return;
+      }
+    }
+    
+    // 如果是三级或更深的路由（如 /user/pets/123），返回到二级路由
+    if (pathParts.length >= 3) {
+      const parentPath = '/' + pathParts.slice(0, 2).join('/');
+      // 检查是否是主页面相关路由
+      if (parentPath === '/user/pets' || parentPath === '/user/apply' || 
+          parentPath === '/user/assess') {
+        if (parentPath === '/user/pets') {
+          currentTab.value = 'pets';
+        } else if (parentPath === '/user/apply') {
+          currentTab.value = 'apply';
+        } else if (parentPath === '/user/assess') {
+          currentTab.value = 'monitor';
+        }
+        showMainPageView.value = false;
+        isTabNavigation.value = true;
+        router.push(parentPath).catch(() => {});
+        return;
+      }
+    }
+  }
+  
+  // 默认情况：使用浏览器历史记录返回
+  // 但需要先检查上一个路由，以便正确设置状态
+  const historyState = window.history.state;
+  if (window.history.length > 1) {
+    // 使用 router.go(-1) 返回，路由监听器会自动处理状态更新
+    router.go(-1);
+  } else {
+    // 如果没有历史记录，返回到主页
+    currentTab.value = 'home';
+    isTabNavigation.value = true;
+    showMainPageView.value = true;
+    router.push('/user').catch(() => {});
+  }
 }
 
 interface MenuItem {
   label: string;
   path: string;
-}
-
-interface MenuGroup {
-  title: string;
-  items: MenuItem[];
   icon: string;
 }
 
@@ -230,10 +333,12 @@ const userInfo = reactive<UserInfo>({
   role: 3 // 用户角色
 });
 
-const expandedGroup = ref('');
 const showProfileDialog = ref(false);
 const profileSaving = ref(false);
 const profileFormRef = ref<FormInstance>();
+const chatUnreadCount = ref(0);
+const unreadMessageCount = ref(0);
+const showMoreMenu = ref(false);
 
 const profileForm = reactive({
   id: '',
@@ -244,48 +349,57 @@ const profileForm = reactive({
   address: ''
 });
 
-// 用户端菜单组
-const menuGroups: MenuGroup[] = [
+// 用户端菜单项（按照原型图样式 - 平级列表）
+const menuItems: MenuItem[] = [
   {
-    title: '宠物管理',
-    icon: '🐾',
-    items: [
-      { label: '宠物列表', path: '/user/pets' },
-      { label: '宠物健康史', path: '/user/diagnosis' }
-    ]
+    label: '首页',
+    path: '/user',
+    icon: '🏠'
   },
   {
-    title: '预约管理',
-    icon: '📅',
-    items: [
-      { label: '预约列表', path: '/user/apply' },
-      { label: '医生时间', path: '/user/free-time' }
-    ]
+    label: '宠物管理',
+    path: '/user/pets',
+    icon: '🐾'
   },
   {
-    title: '日常健康',
-    icon: '❤️',
-    items: [
-      { label: '健康指南', path: '/user/notices' },
-      { label: '健康监测', path: '/user/assess' },
-      { label: '健康标准', path: '/user/standards' }
-    ]
+    label: '预约管理',
+    path: '/user/apply',
+    icon: '📅'
   },
   {
-    title: '宠物档案',
-    icon: '📊',
-    items: [
-      { label: '日志图表', path: '/user/tj-daily' },
-      { label: '宠物日志', path: '/user/pet-daily' }
-    ]
+    label: '健康监测',
+    path: '/user/assess',
+    icon: '❤️'
+  },
+  {
+    label: '诊断记录',
+    path: '/user/diagnosis',
+    icon: '📋'
+  },
+  {
+    label: '消息中心',
+    path: '/user/message',
+    icon: '💬'
+  },
+  {
+    label: '个人中心',
+    path: '/user/mine',
+    icon: '👤'
   }
 ];
 
 const currentPath = computed(() => route.path);
 
-function toggleGroup(title: string) {
-  expandedGroup.value = expandedGroup.value === title ? '' : title;
-}
+// 计算是否应该显示底部导航栏（在移动端，且在主页面相关路由下）
+const shouldShowBottomNav = computed(() => {
+  if (!isMobile.value) return false;
+  const path = route.path;
+  // 在这些路由下显示底部导航栏
+  return path === '/user' || 
+         path === '/user/pets' || 
+         path === '/user/apply' || 
+         path === '/user/assess';
+});
 
 function navigate(path: string) {
   // 移动端：标记这是功能卡片点击
@@ -317,6 +431,13 @@ function navigate(path: string) {
     }
   } else {
     // 电脑端直接导航
+    if (path === '/user') {
+      // 如果点击首页，显示主页视图
+      showMainPageView.value = true;
+      currentTab.value = 'home';
+    } else {
+      showMainPageView.value = false;
+    }
     router.push(path);
   }
 }
@@ -356,17 +477,28 @@ function handleChildNavigate(path: string) {
   }
 }
 
-function switchTab(tab: 'home' | 'mine' | 'message') {
+function switchTab(tab: 'home' | 'pets' | 'apply' | 'monitor') {
   currentTab.value = tab;
-  // 切换tab时，显示主页面视图，不显示路由视图
+  // 切换tab时，根据tab类型决定显示主页面视图还是路由视图
   if (isMobile.value) {
     // 设置标志，表示这是tab导航
     isTabNavigation.value = true;
-    showMainPageView.value = true;
-    // 导航到 /user 路径（虽然会被重定向到 /user/pets，但我们通过标志来控制显示主页面）
-    router.push('/user').catch(() => {
-      // 忽略导航重复的错误
-    });
+    
+    // 根据tab跳转到对应页面
+    if (tab === 'home') {
+      showMainPageView.value = true;
+      router.push('/user').catch(() => {});
+    } else {
+      // 对于其他tab，显示路由视图
+      showMainPageView.value = false;
+      if (tab === 'pets') {
+      router.push('/user/pets').catch(() => {});
+    } else if (tab === 'apply') {
+      router.push('/user/apply').catch(() => {});
+    } else if (tab === 'monitor') {
+      router.push('/user/assess').catch(() => {});
+      }
+    }
   }
 }
 
@@ -378,6 +510,39 @@ function handleCommand(command: string) {
   } else if (command === 'logout') {
     handleLogout();
   }
+}
+
+// 跳转到消息页面
+function goToMessage() {
+  router.push('/user/message');
+}
+
+// 跳转到聊天页面（包含聊天和聊天申请）
+function goToChat() {
+  router.push('/user/chat');
+}
+
+// 跳转到用户主页
+function goToMine() {
+  router.push('/user/mine');
+}
+
+// 获取聊天未读消息数
+async function fetchChatUnreadCount() {
+  try {
+    // 获取聊天未读消息数
+    const count = await getUnreadChatMessageCount();
+    chatUnreadCount.value = typeof count === 'number' ? count : 0;
+  } catch (e) {
+    console.error('获取聊天未读消息数失败:', e);
+    chatUnreadCount.value = 0;
+  }
+}
+
+// 处理聊天消息已读事件
+function handleChatMessageRead() {
+  console.log('UserLayout收到聊天消息已读事件，刷新未读数量');
+  fetchChatUnreadCount();
 }
 
 // 加载个人信息数据
@@ -618,39 +783,66 @@ async function loadUserInfo() {
     }
   }
   
-  // 默认展开第一个菜单组
-  if (menuGroups.length > 0) {
-    expandedGroup.value = menuGroups[0].title;
-  }
+  // 不需要展开菜单组了
+  
+  // 加载聊天未读消息数
+  fetchChatUnreadCount();
+  
+  // 加载通知未读消息数
+  const notification = useNotification();
+  notification.fetchUnreadCount().then(() => {
+    unreadMessageCount.value = notification.unreadCount.value;
+  });
+  
+  // 定期刷新未读消息数
+  setInterval(() => {
+    notification.fetchUnreadCount().then(() => {
+      unreadMessageCount.value = notification.unreadCount.value;
+    });
+  }, 30000);
 }
+
+let chatUnreadInterval: NodeJS.Timeout | null = null;
 
 onMounted(() => {
   loadUserInfo();
   checkMobile();
   window.addEventListener('resize', checkMobile);
   
-  // 移动端：检查初始路径，如果是主页面路径，显示主页面组件
-  if (isMobile.value) {
-    const currentPath = route.path;
-    if (currentPath === '/user') {
-      // 主页面路径，显示主页面视图
-      showMainPageView.value = true;
-      currentTab.value = 'home';
-    } else if (currentPath.startsWith('/user/') && currentPath !== '/user') {
-      // 子路由路径，显示路由视图
-      showMainPageView.value = false;
+  // 定期刷新聊天未读消息数
+  chatUnreadInterval = setInterval(() => {
+    if (userInfo.id) {
+      fetchChatUnreadCount();
     }
+  }, 30000); // 每30秒刷新一次
+  
+  // 添加WebSocket消息处理器，用于处理聊天消息
+  websocketManager.addMessageHandler((message: any) => {
+    // 处理聊天消息，更新聊天未读数量
+    if (message.type === 'chat' && message.data) {
+      console.log('UserLayout收到聊天消息，更新未读数量');
+      fetchChatUnreadCount();
+    }
+  });
+  
+  // 监听聊天消息已读事件，刷新未读数量
+  window.addEventListener('chat-message-read', handleChatMessageRead);
+  
+  // 检查初始路径，如果是主页面路径，显示主页面组件
+  const currentPath = route.path;
+  if (currentPath === '/user') {
+    // 主页面路径，显示主页面视图
+    showMainPageView.value = true;
+    currentTab.value = 'home';
+  } else if (currentPath.startsWith('/user/') && currentPath !== '/user') {
+    // 子路由路径，显示路由视图
+    showMainPageView.value = false;
   }
   
-  // 电脑端：如果路径是 /user，自动重定向到第一个子路由 /user/pets
-  // 移动端：保持 /user 路径，显示主页（UserHome组件）
-  // 使用 nextTick 确保移动端检测完成
+  // 使用 nextTick 确保移动端检测完成后再设置视图
   nextTick(() => {
-    if (!isMobile.value && route.path === '/user') {
-      router.replace('/user/pets');
-    }
-    // 移动端：如果路径是 /user，确保显示主页视图
-    if (isMobile.value && route.path === '/user') {
+    // 如果路径是 /user，确保显示主页视图
+    if (route.path === '/user') {
       showMainPageView.value = true;
       currentTab.value = 'home';
     }
@@ -659,6 +851,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile);
+  window.removeEventListener('chat-message-read', handleChatMessageRead);
+  if (chatUnreadInterval) {
+    clearInterval(chatUnreadInterval);
+  }
 });
 
 // 用于跟踪是否是用户主动点击tab（而不是点击功能卡片）
@@ -667,18 +863,22 @@ const isTabNavigation = ref(false);
 // 用于跟踪是否是用户主动点击功能卡片（用于区分路由重定向和主动跳转）
 const isFunctionCardClick = ref(false);
 
-// 监听路由变化，自动展开对应的菜单组和切换视图
+// 监听路由变化，自动切换视图和刷新未读数量
 watch(() => route.path, (newPath, oldPath) => {
-  // 电脑端：自动展开对应的菜单组
+  // 当从聊天窗口返回时，刷新未读数量
+  if (oldPath && oldPath.startsWith('/user/chat/') && !newPath.startsWith('/user/chat/')) {
+    // 从聊天窗口返回，刷新未读数量
+    fetchChatUnreadCount();
+  }
+  // 电脑端：如果路径是 /user，确保显示主页视图
   if (!isMobile.value) {
-  for (const group of menuGroups) {
-    for (const item of group.items) {
-      if (item.path === newPath) {
-        expandedGroup.value = group.title;
-        return;
-        }
-      }
+    if (newPath === '/user') {
+      showMainPageView.value = true;
+      currentTab.value = 'home';
+    } else {
+      showMainPageView.value = false;
     }
+    return;
   }
   
   // 移动端：根据路由路径和导航类型自动切换视图
@@ -686,6 +886,7 @@ watch(() => route.path, (newPath, oldPath) => {
     // 如果路径正好是 /user，显示主页面视图
     if (newPath === '/user') {
       showMainPageView.value = true;
+      currentTab.value = 'home'; // 确保设置为home tab
       // 只有在确实是tab导航时才重置标志，否则保留功能卡片点击标志
       if (isTabNavigation.value) {
         isTabNavigation.value = false;
@@ -696,6 +897,15 @@ watch(() => route.path, (newPath, oldPath) => {
     
     // 如果路径是子路由
     if (newPath.startsWith('/user/') && newPath !== '/user') {
+      // 根据路径同步currentTab（用于底部导航栏高亮）
+      if (newPath === '/user/pets') {
+        currentTab.value = 'pets';
+      } else if (newPath === '/user/apply') {
+        currentTab.value = 'apply';
+      } else if (newPath === '/user/assess') {
+        currentTab.value = 'monitor';
+      }
+      
       // 优先检查是否是功能卡片点击（功能卡片点击优先级更高）
       if (isFunctionCardClick.value) {
         showMainPageView.value = false;
@@ -704,9 +914,10 @@ watch(() => route.path, (newPath, oldPath) => {
         return;
       }
       
-      // 如果是通过tab导航（点击底部导航或返回按钮），显示主页面视图
+      // 如果是通过tab导航（点击底部导航），显示路由视图（因为switchTab已经设置了showMainPageView）
       if (isTabNavigation.value) {
-        showMainPageView.value = true;
+        // switchTab函数已经根据tab类型设置了showMainPageView的值
+        // 这里只需要重置标志即可
         isTabNavigation.value = false; // 重置标志
         isFunctionCardClick.value = false; // 重置标志
         return;
@@ -729,7 +940,10 @@ watch(() => route.path, (newPath, oldPath) => {
 
 .top-bar {
   height: 51px;
-  background-color: #2b2b2b;
+  background-color: rgba(255, 255, 255, 1);
+  border-style: solid;
+  border-width: 1px;
+  border-color: rgba(224, 224, 224, 1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -743,61 +957,10 @@ watch(() => route.path, (newPath, oldPath) => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.menu-toggle-desktop {
+  background-image: none;
   background: none;
-  border: none;
-  padding: 8px;
-  margin-right: 8px;
-  cursor: pointer;
-  color: #72C1BB;
-  border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s;
-  width: 32px;
-  height: 32px;
 }
 
-.menu-toggle-desktop:hover {
-  background-color: rgba(114, 193, 187, 0.15);
-}
-
-.toggle-icon {
-  width: 20px;
-  height: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  position: relative;
-}
-
-.toggle-icon .line {
-  display: block;
-  height: 2px;
-  width: 100%;
-  background-color: #72C1BB;
-  border-radius: 1px;
-  transition: all 0.3s ease;
-}
-
-.toggle-icon.collapsed .line:nth-child(1) {
-  transform: rotate(45deg) translate(7px, 7px);
-}
-
-.toggle-icon.collapsed .line:nth-child(2) {
-  opacity: 0;
-}
-
-.toggle-icon.collapsed .line:nth-child(3) {
-  transform: rotate(-45deg) translate(7px, -7px);
-}
-
-.menu-toggle-desktop:hover .toggle-icon .line {
-  background-color: #a5f3eb;
-}
 
 /* 移动端返回按钮 */
 .back-button {
@@ -833,11 +996,25 @@ watch(() => route.path, (newPath, oldPath) => {
   flex-shrink: 0;
 }
 
+.title-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .logo .title {
   color: #72C1BB;
   font-size: 18px;
   font-weight: bold;
   white-space: nowrap;
+  line-height: 1.2;
+}
+
+.logo .subtitle {
+  color: #72C1BB;
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1;
 }
 
 .user-info {
@@ -853,8 +1030,100 @@ watch(() => route.path, (newPath, oldPath) => {
   margin: 0 5px;
 }
 
-.dropdown-trigger {
+.notification-button,
+.help-button,
+.user-avatar-button {
+  position: relative;
+  cursor: pointer;
+  margin: 0 8px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+  border-radius: 4px;
+}
+
+.notification-button:hover,
+.help-button:hover,
+.user-avatar-button:hover {
+  background-color: rgba(114, 193, 187, 0.1);
+}
+
+.notification-icon,
+.help-icon,
+.user-avatar-icon {
+  font-size: 20px;
   color: #72C1BB;
+}
+
+.notification-button .notification-badge,
+.help-button .chat-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #2b2b2b;
+}
+
+.notification-button-mobile,
+.chat-button-mobile,
+.user-avatar-button-mobile {
+  position: relative;
+  cursor: pointer;
+  margin-left: 12px;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  border: 2px solid #2b2b2b;
+}
+
+.chat-icon {
+  font-size: 20px;
+  color: #72C1BB;
+}
+
+.chat-button-mobile .chat-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #2b2b2b;
+}
+
+.dropdown-trigger {
+  color: rgba(0, 0, 0, 1);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -888,34 +1157,47 @@ watch(() => route.path, (newPath, oldPath) => {
 }
 
 .left-menu {
-  width: 180px;
-  background-color: #72C1BB;
+  width: 200px;
+  background-color: rgba(255, 255, 255, 1);
   overflow-y: auto;
   flex-shrink: 0;
-  transition: width 0.2s ease;
+  border-right: 1px solid rgba(224, 224, 224, 1);
+  padding: 8px 0;
 }
 
-.left-menu.collapsed {
-  width: 60px;
-}
-
-.left-menu.collapsed .menu-title {
-  padding: 12px 8px;
-  justify-content: center;
+.menu-item {
+  padding: 14px 20px;
+  color: #333;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
   align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+  font-size: 15px;
+  border-left: 3px solid transparent;
+  margin: 0;
 }
 
-.left-menu.collapsed .arrow {
-  display: none;
+.menu-item:hover {
+  background-color: #f0f0f0;
 }
 
-.left-menu.collapsed .menu-list {
-  display: none;
+.menu-item.active {
+  background-color: #e8f5f3;
+  color: #72C1BB;
+  border-left: 3px solid #72C1BB;
+  font-weight: 600;
 }
 
 .menu-icon {
   font-size: 20px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .menu-text {
@@ -923,65 +1205,7 @@ watch(() => route.path, (newPath, oldPath) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.left-menu.collapsed .menu-text {
-  display: none;
-}
-
-.left-menu.collapsed .menu-icon {
-  font-size: 24px;
-}
-
-.menu-group {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.menu-title {
-  padding: 12px 15px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: background-color 0.2s;
-}
-
-.menu-title:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.menu-title.active {
-  background-color: rgba(0, 0, 0, 0.15);
-}
-
-.arrow {
-  font-size: 10px;
-}
-
-.menu-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.menu-list li {
-  padding: 10px 15px 10px 25px;
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  font-size: 14px;
-}
-
-.menu-list li:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.menu-list li.selected {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-left: 3px solid white;
+  line-height: 1.5;
 }
 
 .content-area {
@@ -1030,6 +1254,18 @@ watch(() => route.path, (newPath, oldPath) => {
 .nav-icon {
   font-size: 24px;
   margin-bottom: 4px;
+  position: relative;
+}
+
+.nav-icon .notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  border: 1px solid white;
 }
 
 .nav-label {

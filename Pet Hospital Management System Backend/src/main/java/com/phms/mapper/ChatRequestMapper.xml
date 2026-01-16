@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.phms.mapper.ChatRequestMapper">
+  <resultMap id="BaseResultMap" type="com.phms.pojo.ChatRequest">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="user_id" jdbcType="BIGINT" property="userId" />
+    <result column="doctor_id" jdbcType="BIGINT" property="doctorId" />
+    <result column="status" jdbcType="TINYINT" property="status" />
+    <result column="request_message" jdbcType="VARCHAR" property="requestMessage" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="user_name" jdbcType="VARCHAR" property="userName" />
+    <result column="user_img" jdbcType="VARCHAR" property="userImg" />
+    <result column="doctor_name" jdbcType="VARCHAR" property="doctorName" />
+    <result column="doctor_img" jdbcType="VARCHAR" property="doctorImg" />
+  </resultMap>
+
+  <sql id="Base_Column_List">
+    cr.id, cr.user_id, cr.doctor_id, cr.status, cr.request_message, cr.create_time, cr.update_time
+  </sql>
+
+  <!-- 插入聊天申请 -->
+  <insert id="insert" parameterType="com.phms.pojo.ChatRequest" useGeneratedKeys="true" keyProperty="id">
+    insert into chat_request
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="userId != null">
+        user_id,
+      </if>
+      <if test="doctorId != null">
+        doctor_id,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="requestMessage != null">
+        request_message,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="updateTime != null">
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="userId != null">
+        #{userId,jdbcType=BIGINT},
+      </if>
+      <if test="doctorId != null">
+        #{doctorId,jdbcType=BIGINT},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=TINYINT},
+      </if>
+      <if test="requestMessage != null">
+        #{requestMessage,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+
+  <!-- 根据ID查询申请 -->
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_request cr
+    left join user u on cr.user_id = u.id
+    left join user d on cr.doctor_id = d.id
+    where cr.id = #{id}
+  </select>
+
+  <!-- 根据用户ID查询申请列表 -->
+  <select id="selectByUserId" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_request cr
+    left join user u on cr.user_id = u.id
+    left join user d on cr.doctor_id = d.id
+    where cr.user_id = #{userId}
+    <if test="status != null">
+      and cr.status = #{status}
+    </if>
+    order by cr.create_time desc
+  </select>
+
+  <!-- 根据医生ID查询申请列表 -->
+  <select id="selectByDoctorId" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_request cr
+    left join user u on cr.user_id = u.id
+    left join user d on cr.doctor_id = d.id
+    where cr.doctor_id = #{doctorId}
+    <if test="status != null">
+      and cr.status = #{status}
+    </if>
+    order by cr.create_time desc
+  </select>
+
+  <!-- 更新申请状态 -->
+  <update id="updateStatus">
+    update chat_request
+    set status = #{status},
+        update_time = NOW()
+    where id = #{id}
+  </update>
+
+  <!-- 检查是否已有待审核或已同意的申请 -->
+  <select id="selectExistingRequest" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from chat_request cr
+    where cr.user_id = #{userId}
+      and cr.doctor_id = #{doctorId}
+      and cr.status in (0, 1)
+    order by cr.create_time desc
+    limit 1
+  </select>
+
+  <!-- 查询所有申请（管理员） -->
+  <select id="selectAll" parameterType="com.phms.pojo.ChatRequest" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_request cr
+    left join user u on cr.user_id = u.id
+    left join user d on cr.doctor_id = d.id
+    <where>
+      <if test="userId != null">
+        and cr.user_id = #{userId}
+      </if>
+      <if test="doctorId != null">
+        and cr.doctor_id = #{doctorId}
+      </if>
+      <if test="status != null">
+        and cr.status = #{status}
+      </if>
+    </where>
+    order by cr.create_time desc
+    <if test="page != null and limit != null">
+      limit #{page}, #{limit}
+    </if>
+  </select>
+
+  <!-- 统计申请数量 -->
+  <select id="countByCondition" parameterType="com.phms.pojo.ChatRequest" resultType="int">
+    select count(*) from chat_request cr
+    <where>
+      <if test="userId != null">
+        and cr.user_id = #{userId}
+      </if>
+      <if test="doctorId != null">
+        and cr.doctor_id = #{doctorId}
+      </if>
+      <if test="status != null">
+        and cr.status = #{status}
+      </if>
+    </where>
+  </select>
+</mapper>

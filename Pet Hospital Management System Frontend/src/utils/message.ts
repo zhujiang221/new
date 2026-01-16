@@ -3,7 +3,7 @@ import { ref } from 'vue';
 // 消息弹窗状态
 const showMessageModal = ref(false);
 const messageText = ref('');
-const messageType = ref<'success' | 'error'>('success');
+const messageType = ref<'success' | 'error' | 'warning'>('success');
 const messageCallback = ref<(() => void) | null>(null);
 
 // 确认弹窗状态
@@ -12,11 +12,11 @@ const confirmText = ref('');
 const confirmCallback = ref<((confirmed: boolean) => void) | null>(null);
 
 /**
- * 显示消息提示（成功或错误）
+ * 显示消息提示（成功、错误或警告）
  * @param text 提示文本
- * @param type 消息类型：'success' | 'error'
+ * @param type 消息类型：'success' | 'error' | 'warning'
  */
-export function showMessage(text: string, type: 'success' | 'error' = 'success') {
+export function showMessage(text: string, type: 'success' | 'error' | 'warning' = 'success') {
   messageText.value = text;
   messageType.value = type;
   showMessageModal.value = true;

@@ -66,9 +66,6 @@ public class MedicineController {
         }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)
-        if (user == null) {
-            return "LGINOUT";
-        }
         Integer roleId = userService.getUserRoleId(user.getId());
         if (roleId == null) {
             roleId = 3; // 默认普通用户
@@ -107,9 +104,6 @@ public class MedicineController {
         }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)
-        if (user == null) {
-            return "LGINOUT";
-        }
         Integer roleId = userService.getUserRoleId(user.getId());
         if (roleId == null) {
             roleId = 3; // 默认普通用户
@@ -142,9 +136,6 @@ public class MedicineController {
         }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)
-        if (user == null) {
-            return "LGINOUT";
-        }
         Integer roleId = userService.getUserRoleId(user.getId());
         if (roleId == null) {
             roleId = 3; // 默认普通用户

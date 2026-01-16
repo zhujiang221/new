@@ -213,12 +213,6 @@ public class DoctorScheduleController {
             return "NOT_LOGIN";
         }
         
-        // 检查用户是否已登录
-        if (user == null) {
-            logger.error("用户未登录");
-            return "NOT_LOGIN";
-        }
-        
         // 如果不是管理员，只能给自己应用模板
         if (user.getRole() == null || user.getRole() != 1) {
             doctorId = user.getId();

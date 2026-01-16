@@ -1,10 +1,16 @@
 package com.phms.controller.user;
 
+import com.alibaba.fastjson.JSON;
 import com.phms.pojo.Appointment;
+import com.phms.pojo.AppointmentType;
+import com.phms.pojo.NotificationMessage;
 import com.phms.pojo.User;
 import com.phms.service.AppointmentService;
+import com.phms.service.NotificationMessageService;
 import com.phms.utils.JwtUtil;
+import com.phms.mapper.AppointmentTypeMapper;
 import com.phms.mapper.UserMapper;
+import com.phms.websocket.NotificationWebSocketHandler;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
@@ -21,6 +27,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +46,14 @@ public class UserApplyController {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private NotificationMessageService notificationMessageService;
+
+    @Autowired
+    private NotificationWebSocketHandler notificationWebSocketHandler;
+
+    @Autowired
+    private AppointmentTypeMapper appointmentTypeMapper;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     /**
@@ -73,7 +88,47 @@ public class UserApplyController {
     @ResponseBody
     public Object getAllByLimit(Appointment appointment) {
         Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        Object principal = subject.getPrincipal();
+
+        User user = null;
+        if (principal instanceof User) {
+            user = (User) principal;
+        } else {
+            // 兜底：从Authorization的Bearer Token中解析用户名再查库，避免principal为null导致NPE
+            try {
+                ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String authHeader = attrs.getRequest().getHeader("Authorization");
+                    if (authHeader != null && !authHeader.isEmpty()) {
+                        String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+                        String username = jwtUtil.getUsernameFromToken(token);
+                        if (username != null) {
+                            user = userMapper.getByUsername(username);
+                            logger.info("通过Token兜底获取用户信息成功，username: {}", username);
+                        } else {
+                            logger.error("通过Token解析用户名失败，authHeader前20: {}", authHeader.length() > 20 ? authHeader.substring(0, 20) + "..." : authHeader);
+                        }
+                    } else {
+                        logger.error("Authorization头为空，无法兜底获取用户信息");
+                    }
+                } else {
+                    logger.error("RequestContextHolder未获取到请求上下文，无法兜底获取用户信息");
+                }
+            } catch (Exception e) {
+                logger.error("兜底解析Token获取用户失败", e);
+            }
+        }
+
+        if (user == null) {
+            logger.error("当前会话未获取到有效用户对象，principal: {}", principal);
+            return "LGINOUT";
+        }
+
+        // 防御性编程：确保 appointment 不为 null，避免 NPE
+        if (appointment == null) {
+            appointment = new Appointment();
+        }
+
         appointment.setUserId(user.getId());
         return appointmentService.getAllByLimit(appointment);
     }
@@ -174,7 +229,42 @@ public class UserApplyController {
     @Transactional
     public String doAdd(Appointment appointment) {
         Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        Object principal = subject.getPrincipal();
+
+        User user = null;
+        if (principal instanceof User) {
+            user = (User) principal;
+        } else {
+            // 兜底：从Authorization的Bearer Token中解析用户名再查库，避免principal为null导致NPE
+            try {
+                ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String authHeader = attrs.getRequest().getHeader("Authorization");
+                    if (authHeader != null && !authHeader.isEmpty()) {
+                        String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+                        String username = jwtUtil.getUsernameFromToken(token);
+                        if (username != null) {
+                            user = userMapper.getByUsername(username);
+                            logger.info("通过Token兜底获取用户信息成功，username: {}", username);
+                        } else {
+                            logger.error("通过Token解析用户名失败，authHeader前20: {}", authHeader.length() > 20 ? authHeader.substring(0, 20) + "..." : authHeader);
+                        }
+                    } else {
+                        logger.error("Authorization头为空，无法兜底获取用户信息");
+                    }
+                } else {
+                    logger.error("RequestContextHolder未获取到请求上下文，无法兜底获取用户信息");
+                }
+            } catch (Exception e) {
+                logger.error("兜底解析Token获取用户失败", e);
+            }
+        }
+
+        if (user == null) {
+            logger.error("当前会话未获取到有效用户对象，principal: {}", principal);
+            return "LGINOUT";
+        }
+
         if (appointment.getPetId() == null){
             return "noPetId";
         }
@@ -215,6 +305,76 @@ public class UserApplyController {
                 return "FULL";
             }
             
+            // 预约成功后，创建通知消息并推送给医生
+            try {
+                // 获取预约ID（插入后自动生成）
+                Long appointmentId = appointment.getId();
+                if (appointmentId == null) {
+                    // 如果ID未自动生成，记录警告但继续创建通知（使用null作为appointmentId）
+                    logger.warn("预约ID未自动生成，但继续创建通知 - 医生ID: {}, 用户ID: {}", 
+                        appointment.getDoctorId(), user.getId());
+                }
+                
+                // 无论ID是否为空，都创建通知（通知可以没有appointmentId）
+                if (appointment.getDoctorId() != null) {
+                    // 获取预约类型名称
+                    String appointmentTypeName = "看病"; // 默认值
+                    if (appointment.getAppointmentTypeId() != null) {
+                        try {
+                            AppointmentType appointmentType = appointmentTypeMapper.selectByPrimaryKey(appointment.getAppointmentTypeId());
+                            if (appointmentType != null && appointmentType.getName() != null) {
+                                appointmentTypeName = appointmentType.getName();
+                            }
+                        } catch (Exception e) {
+                            logger.warn("获取预约类型名称失败，使用默认值", e);
+                        }
+                    }
+                    
+                    // 使用已有的 appDate 变量（已在前面定义）
+                    
+                    // 构建通知内容（JSON格式）
+                    Map<String, Object> contentMap = new HashMap<>();
+                    contentMap.put("userName", user.getName() != null ? user.getName() : user.getUsername());
+                    contentMap.put("appDate", appDate);
+                    contentMap.put("timeSlot", appointment.getTimeSlot());
+                    contentMap.put("appointmentTypeName", appointmentTypeName);
+                    if (appointment.getInfo() != null && !appointment.getInfo().isEmpty()) {
+                        contentMap.put("info", appointment.getInfo());
+                    }
+                    String contentJson = JSON.toJSONString(contentMap);
+                    
+                    // 创建通知消息
+                    NotificationMessage notification = new NotificationMessage();
+                    notification.setReceiverId(appointment.getDoctorId()); // 接收者是医生
+                    notification.setSenderId(user.getId()); // 发送者是用户
+                    notification.setAppointmentId(appointmentId);
+                    notification.setType("APPOINTMENT");
+                    notification.setTitle("新预约通知");
+                    notification.setContent(contentJson);
+                    notification.setIsRead(0); // 未读
+                    notification.setCreateTime(new Date());
+                    
+                    // 保存通知消息
+                    notificationMessageService.createMessage(notification);
+                    logger.info("预约通知消息已创建 - 预约ID: {}, 医生ID: {}, 用户ID: {}", 
+                        appointmentId, appointment.getDoctorId(), user.getId());
+                    
+                    // 通过WebSocket推送通知给医生
+                    Map<String, Object> wsMessage = new HashMap<>();
+                    wsMessage.put("type", "notification");
+                    wsMessage.put("data", notification);
+                    String wsMessageJson = JSON.toJSONString(wsMessage);
+                    notificationWebSocketHandler.sendMessageToUser(appointment.getDoctorId(), wsMessageJson);
+                    logger.info("预约通知已通过WebSocket推送 - 医生ID: {}", appointment.getDoctorId());
+                }
+            } catch (Exception e) {
+                // 通知创建失败不影响预约成功，只记录日志
+                logger.error("创建预约通知失败 - 预约ID: {}, 医生ID: {}, 用户ID: {}", 
+                    appointment.getId(), appointment.getDoctorId(), user.getId(), e);
+                // 打印完整的异常堆栈，便于调试
+                e.printStackTrace();
+            }
+            
             return "SUCCESS";
         } catch (RuntimeException e) {
             // 业务异常（如找不到排班记录）
@@ -236,8 +396,41 @@ public class UserApplyController {
     @Transactional
     public String chStatus(Appointment appointment) {
         Subject subject = SecurityUtils.getSubject();
-        User user = (User) subject.getPrincipal();
+        Object principal = subject.getPrincipal();
 
+        User user = null;
+        if (principal instanceof User) {
+            user = (User) principal;
+        } else {
+            // 兜底：从Authorization的Bearer Token中解析用户名再查库，避免principal为null导致NPE
+            try {
+                ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String authHeader = attrs.getRequest().getHeader("Authorization");
+                    if (authHeader != null && !authHeader.isEmpty()) {
+                        String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+                        String username = jwtUtil.getUsernameFromToken(token);
+                        if (username != null) {
+                            user = userMapper.getByUsername(username);
+                            logger.info("通过Token兜底获取用户信息成功，username: {}", username);
+                        } else {
+                            logger.error("通过Token解析用户名失败，authHeader前20: {}", authHeader.length() > 20 ? authHeader.substring(0, 20) + "..." : authHeader);
+                        }
+                    } else {
+                        logger.error("Authorization头为空，无法兜底获取用户信息");
+                    }
+                } else {
+                    logger.error("RequestContextHolder未获取到请求上下文，无法兜底获取用户信息");
+                }
+            } catch (Exception e) {
+                logger.error("兜底解析Token获取用户失败", e);
+            }
+        }
+
+        if (user == null) {
+            logger.error("当前会话未获取到有效用户对象，principal: {}", principal);
+            return "LGINOUT";
+        }
 
         try {
             appointment.setDoctorId(user.getId());

@@ -1,6 +1,5 @@
 package com.phms.controller.user;
 
-import com.phms.mapper.UserMapper;
 import com.phms.pojo.AppointmentType;
 import com.phms.pojo.User;
 import com.phms.service.AppointmentTypeService;
@@ -28,9 +27,6 @@ public class AppointmentTypeController {
 
     @Autowired
     private AppointmentTypeService appointmentTypeService;
-    
-    @Autowired
-    private UserMapper userMapper;
     
     @Autowired
     private UserContext userContext;

@@ -68,4 +68,17 @@ public class ResultMap extends HashMap<String, Object> {
 		this.put("data", user);
 		return this;
 	}
+
+	/**
+	 * Method name: data <BR>
+	 * Description: 返回数据（通用方法，支持任意类型） <BR>
+	 * Remark: <BR>
+	 * 
+	 * @param data 数据对象（可以是Map、List、或其他任意类型）
+	 * @return ResultMap<BR>
+	 */
+	public ResultMap data(Object data) {
+		this.put("data", data);
+		return this;
+	}
 }

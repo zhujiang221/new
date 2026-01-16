@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.phms.mapper.ChatSessionMapper">
+  <resultMap id="BaseResultMap" type="com.phms.pojo.ChatSession">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="user_id" jdbcType="BIGINT" property="userId" />
+    <result column="doctor_id" jdbcType="BIGINT" property="doctorId" />
+    <result column="request_id" jdbcType="BIGINT" property="requestId" />
+    <result column="status" jdbcType="TINYINT" property="status" />
+    <result column="last_message_time" jdbcType="TIMESTAMP" property="lastMessageTime" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="user_name" jdbcType="VARCHAR" property="userName" />
+    <result column="user_img" jdbcType="VARCHAR" property="userImg" />
+    <result column="doctor_name" jdbcType="VARCHAR" property="doctorName" />
+    <result column="doctor_img" jdbcType="VARCHAR" property="doctorImg" />
+    <result column="unread_count" jdbcType="INTEGER" property="unreadCount" />
+    <result column="last_message_content" jdbcType="VARCHAR" property="lastMessageContent" />
+    <result column="last_message_type" jdbcType="VARCHAR" property="lastMessageType" />
+  </resultMap>
+
+  <sql id="Base_Column_List">
+    cs.id, cs.user_id, cs.doctor_id, cs.request_id, cs.status, cs.last_message_time, cs.create_time
+  </sql>
+
+  <!-- 插入聊天会话 -->
+  <insert id="insert" parameterType="com.phms.pojo.ChatSession" useGeneratedKeys="true" keyProperty="id">
+    insert into chat_session
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="userId != null">
+        user_id,
+      </if>
+      <if test="doctorId != null">
+        doctor_id,
+      </if>
+      <if test="requestId != null">
+        request_id,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="lastMessageTime != null">
+        last_message_time,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="userId != null">
+        #{userId,jdbcType=BIGINT},
+      </if>
+      <if test="doctorId != null">
+        #{doctorId,jdbcType=BIGINT},
+      </if>
+      <if test="requestId != null">
+        #{requestId,jdbcType=BIGINT},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=TINYINT},
+      </if>
+      <if test="lastMessageTime != null">
+        #{lastMessageTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+
+  <!-- 根据ID查询会话 -->
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_session cs
+    left join user u on cs.user_id = u.id
+    left join user d on cs.doctor_id = d.id
+    where cs.id = #{id}
+  </select>
+
+  <!-- 根据用户ID查询会话列表 -->
+  <select id="selectByUserId" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img,
+    (select count(*) from chat_message cm where cm.session_id = cs.id and cm.receiver_id = #{userId} and cm.is_read = 0) as unread_count,
+    (select cm.content from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_content,
+    (select cm.message_type from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_type
+    from chat_session cs
+    left join user u on cs.user_id = u.id
+    left join user d on cs.doctor_id = d.id
+    where cs.user_id = #{userId} and cs.status = 1
+    order by cs.last_message_time desc, cs.create_time desc
+  </select>
+
+  <!-- 根据医生ID查询会话列表 -->
+  <select id="selectByDoctorId" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img,
+    (select count(*) from chat_message cm where cm.session_id = cs.id and cm.receiver_id = #{doctorId} and cm.is_read = 0) as unread_count,
+    (select cm.content from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_content,
+    (select cm.message_type from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_type
+    from chat_session cs
+    left join user u on cs.user_id = u.id
+    left join user d on cs.doctor_id = d.id
+    where cs.doctor_id = #{doctorId} and cs.status = 1
+    order by cs.last_message_time desc, cs.create_time desc
+  </select>
+
+  <!-- 根据用户ID和医生ID查询会话 -->
+  <select id="selectByUserAndDoctor" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_session cs
+    left join user u on cs.user_id = u.id
+    left join user d on cs.doctor_id = d.id
+    where cs.user_id = #{userId} and cs.doctor_id = #{doctorId} and cs.status = 1
+    limit 1
+  </select>
+
+  <!-- 更新会话状态 -->
+  <update id="updateStatus">
+    update chat_session
+    set status = #{status}
+    where id = #{id}
+  </update>
+
+  <!-- 更新最后消息时间 -->
+  <update id="updateLastMessageTime">
+    update chat_session
+    set last_message_time = NOW()
+    where id = #{id}
+  </update>
+
+  <!-- 查询所有会话（管理员） -->
+  <select id="selectAll" parameterType="com.phms.pojo.ChatSession" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />,
+    u.name as user_name, u.img as user_img,
+    d.name as doctor_name, d.img as doctor_img
+    from chat_session cs
+    left join user u on cs.user_id = u.id
+    left join user d on cs.doctor_id = d.id
+    <where>
+      <if test="userId != null">
+        and cs.user_id = #{userId}
+      </if>
+      <if test="doctorId != null">
+        and cs.doctor_id = #{doctorId}
+      </if>
+      <if test="status != null">
+        and cs.status = #{status}
+      </if>
+    </where>
+    order by cs.last_message_time desc, cs.create_time desc
+    <if test="page != null and limit != null">
+      limit #{page}, #{limit}
+    </if>
+  </select>
+
+  <!-- 统计会话数量 -->
+  <select id="countByCondition" parameterType="com.phms.pojo.ChatSession" resultType="int">
+    select count(*) from chat_session cs
+    <where>
+      <if test="userId != null">
+        and cs.user_id = #{userId}
+      </if>
+      <if test="doctorId != null">
+        and cs.doctor_id = #{doctorId}
+      </if>
+      <if test="status != null">
+        and cs.status = #{status}
+      </if>
+    </where>
+  </select>
+</mapper>

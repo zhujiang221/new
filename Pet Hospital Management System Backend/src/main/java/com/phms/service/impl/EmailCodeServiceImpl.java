@@ -58,6 +58,10 @@ public class EmailCodeServiceImpl implements EmailCodeService {
             
             // 生成验证码
             String code = emailUtil.generateCode();
+            if (code == null || email == null) {
+                logger.error("生成验证码失败或邮箱为空: email={}", email);
+                return false;
+            }
             
             // 发送邮件
             boolean sendSuccess = emailUtil.sendVerificationCode(email, code);

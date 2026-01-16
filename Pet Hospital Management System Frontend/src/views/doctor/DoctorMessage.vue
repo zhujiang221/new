@@ -9,7 +9,7 @@
       </div>
       
       <!-- 空状态 -->
-      <div v-else-if="displayMessages.length === 0 && appointmentNotifications.length === 0" class="empty-state">
+      <div v-else-if="allMessages.length === 0" class="empty-state">
         <div class="empty-icon">💬</div>
         <div class="empty-title">暂无消息</div>
         <div class="empty-desc">您还没有收到任何消息</div>
@@ -17,54 +17,59 @@
 
       <!-- 消息列表 -->
       <div v-else class="messages">
-        <!-- 新预约通知汇总（置顶） -->
+        <!-- 聊天申请（如果有未处理的申请，显示在第二个位置） -->
         <div
-          v-if="appointmentNotifications.length > 0"
-          class="message-item appointment-summary"
-          :class="{ 'unread': hasUnreadAppointments }"
-          @click="handleAppointmentSummaryClick"
+          v-if="pendingChatRequests.length > 0"
+          class="message-item chat-request-item"
+          :class="{ 'unread': true }"
+          @click="handleChatRequestClick"
         >
           <div class="message-header">
             <div class="message-title-wrapper">
-              <div class="message-title">新预约通知</div>
-              <div v-if="hasUnreadAppointments" class="red-dot"></div>
+              <div class="message-title">有人加你</div>
+              <div class="red-dot"></div>
             </div>
-            <div class="message-time">{{ formatTime(latestAppointmentTime) }}</div>
+            <div class="message-time">{{ formatTime(latestChatRequestTime) }}</div>
           </div>
           <div class="message-content">
             <div class="summary-info">
               <div class="summary-count">
-                <span class="count-number">{{ appointmentNotifications.length }}</span>
-                <span class="count-text">条新预约</span>
+                <span class="count-number">{{ pendingChatRequests.length }}</span>
+                <span class="count-text">条聊天申请</span>
               </div>
-              <div v-if="latestAppointment" class="summary-preview">
+              <div v-if="latestChatRequest" class="summary-preview">
                 <div class="preview-text">
                   <span class="preview-label">最新：</span>
-                  <span class="preview-content">{{ getPreviewText(latestAppointment) }}</span>
+                  <span class="preview-content">{{ latestChatRequest.userName || '未知用户' }}：{{ latestChatRequest.requestMessage || '申请与你聊天' }}</span>
                 </div>
               </div>
             </div>
           </div>
-          <div v-if="hasUnreadAppointments" class="unread-badge">未读</div>
+          <div class="unread-badge">未读</div>
         </div>
 
-        <!-- 其他消息 -->
+        <!-- 预约通知（逐个显示） -->
         <div
-          v-for="message in displayMessages"
-          :key="message.id"
-          class="message-item"
+          v-for="message in appointmentNotifications"
+          :key="`appointment-${message.id}`"
+          class="message-item appointment-item"
           :class="{ 'unread': message.isRead === 0 }"
-          @click="handleMessageClick(message)"
+          @click="handleAppointmentClick(message)"
         >
           <div class="message-header">
             <div class="message-title-wrapper">
-              <div class="message-title">{{ message.title }}</div>
+              <div class="message-title">新预约通知</div>
               <div v-if="message.isRead === 0" class="red-dot"></div>
             </div>
             <div class="message-time">{{ formatTime(message.createTime) }}</div>
           </div>
           <div class="message-content">
-            <template v-if="getMessageContent(message.id)">
+            <!-- BROADCAST类型消息直接显示内容 -->
+            <template v-if="message.type === 'BROADCAST'">
+              <div class="content-text">{{ getDisplayContent(message) }}</div>
+            </template>
+            <!-- 预约通知显示详细信息 -->
+            <template v-else-if="getMessageContent(message.id)">
               <div class="content-detail">
                 <div class="detail-item">
                   <span class="label">用户：</span>
@@ -88,7 +93,59 @@
                 </div>
               </div>
             </template>
-            <div v-else class="content-text">{{ message.content }}</div>
+            <!-- 其他类型消息显示文本内容 -->
+            <div v-else class="content-text">{{ getDisplayContent(message) }}</div>
+          </div>
+          <div v-if="message.isRead === 0" class="unread-badge">未读</div>
+        </div>
+
+        <!-- 其他消息 -->
+        <div
+          v-for="message in displayMessages"
+          :key="`msg-${message.id}`"
+          class="message-item"
+          :class="{ 'unread': message.isRead === 0 }"
+          @click="handleMessageClick(message)"
+        >
+          <div class="message-header">
+            <div class="message-title-wrapper">
+              <div class="message-title">{{ message.title }}</div>
+              <div v-if="message.isRead === 0" class="red-dot"></div>
+            </div>
+            <div class="message-time">{{ formatTime(message.createTime) }}</div>
+          </div>
+          <div class="message-content">
+            <!-- BROADCAST类型消息直接显示内容 -->
+            <template v-if="message.type === 'BROADCAST'">
+              <div class="content-text">{{ getDisplayContent(message) }}</div>
+            </template>
+            <!-- 预约通知显示详细信息 -->
+            <template v-else-if="getMessageContent(message.id)">
+              <div class="content-detail">
+                <div class="detail-item">
+                  <span class="label">用户：</span>
+                  <span class="value">{{ getMessageContent(message.id)?.userName }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">日期：</span>
+                  <span class="value">{{ getMessageContent(message.id)?.appDate }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">时间段：</span>
+                  <span class="value">{{ getMessageContent(message.id)?.timeSlot }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">类型：</span>
+                  <span class="value">{{ getMessageContent(message.id)?.appointmentTypeName }}</span>
+                </div>
+                <div v-if="getMessageContent(message.id)?.info" class="detail-item">
+                  <span class="label">内容：</span>
+                  <span class="value">{{ getMessageContent(message.id)?.info }}</span>
+                </div>
+              </div>
+            </template>
+            <!-- 其他类型消息显示文本内容 -->
+            <div v-else class="content-text">{{ getDisplayContent(message) }}</div>
           </div>
           <div v-if="message.isRead === 0" class="unread-badge">未读</div>
         </div>
@@ -108,66 +165,73 @@
       </div>
     </div>
 
-    <!-- 新预约通知对话框 -->
-    <div v-if="showAppointmentDialog" class="modal-overlay" @click.self="showAppointmentDialog = false">
-      <div class="appointment-dialog">
+    <!-- 聊天申请管理对话框 -->
+    <div v-if="showChatRequestDialog" class="modal-overlay" @click.self="showChatRequestDialog = false">
+      <div class="chat-request-dialog">
         <div class="dialog-header">
-          <h3>新预约通知</h3>
-          <button class="dialog-close" @click="showAppointmentDialog = false">&times;</button>
+          <h3>聊天申请管理</h3>
+          <button class="dialog-close" @click="showChatRequestDialog = false">&times;</button>
         </div>
         <div class="dialog-body">
-          <div v-if="appointmentNotifications.length === 0" class="empty-dialog">
-            <div class="empty-icon">📋</div>
-            <div class="empty-title">暂无预约通知</div>
+          <div v-if="loadingChatRequests" class="loading-state">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>加载中...</span>
           </div>
-          <div v-else class="appointment-list">
+          <div v-else-if="allChatRequests.length === 0" class="empty-dialog">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">暂无聊天申请</div>
+          </div>
+          <div v-else class="chat-request-list">
             <div
-              v-for="message in appointmentNotifications"
-              :key="message.id"
-              class="appointment-item"
-              :class="{ 'unread': message.isRead === 0 }"
-              @click="handleAppointmentItemClick(message)"
+              v-for="request in allChatRequests"
+              :key="request.id"
+              class="chat-request-item-dialog"
+              :class="{ 'pending': request.status === 0 }"
             >
-              <div class="appointment-header">
-                <div class="appointment-title-wrapper">
-                  <div class="appointment-title">新预约通知</div>
-                  <div v-if="message.isRead === 0" class="red-dot"></div>
-                </div>
-                <div class="appointment-time">{{ formatTime(message.createTime) }}</div>
-              </div>
-              <div class="appointment-content">
-                <template v-if="getMessageContent(message.id)">
-                  <div class="content-detail">
-                    <div class="detail-item">
-                      <span class="label">用户：</span>
-                      <span class="value">{{ getMessageContent(message.id)?.userName }}</span>
-                    </div>
-                    <div class="detail-item">
-                      <span class="label">日期：</span>
-                      <span class="value">{{ getMessageContent(message.id)?.appDate }}</span>
-                    </div>
-                    <div class="detail-item">
-                      <span class="label">时间段：</span>
-                      <span class="value">{{ getMessageContent(message.id)?.timeSlot }}</span>
-                    </div>
-                    <div class="detail-item">
-                      <span class="label">类型：</span>
-                      <span class="value">{{ getMessageContent(message.id)?.appointmentTypeName }}</span>
-                    </div>
-                    <div v-if="getMessageContent(message.id)?.info" class="detail-item">
-                      <span class="label">内容：</span>
-                      <span class="value">{{ getMessageContent(message.id)?.info }}</span>
-                    </div>
+              <div class="request-header">
+                <div class="user-info">
+                  <div class="user-avatar">
+                    <img v-if="request.userImg" :src="request.userImg" :alt="request.userName" />
+                    <div v-else class="avatar-placeholder">{{ request.userName?.charAt(0) || 'U' }}</div>
                   </div>
-                </template>
-                <div v-else class="content-text">{{ message.content }}</div>
+                  <div class="user-details">
+                    <div class="user-name">{{ request.userName || '未知用户' }}</div>
+                    <div class="request-time">{{ formatTime(request.createTime) }}</div>
+                  </div>
+                </div>
+                <div class="request-status" :class="getStatusClass(request.status)">
+                  {{ getStatusText(request.status) }}
+                </div>
               </div>
-              <div v-if="message.isRead === 0" class="unread-badge">未读</div>
+              <div v-if="request.requestMessage" class="request-message">
+                <div class="message-label">申请留言：</div>
+                <div class="message-content">{{ request.requestMessage }}</div>
+              </div>
+              <div v-if="request.status === 0" class="request-actions">
+                <button class="btn btn-success" @click="approveRequest(request.id!)">
+                  同意
+                </button>
+                <button class="btn btn-danger" @click="rejectRequest(request.id!)">
+                  拒绝
+                </button>
+              </div>
+              <div v-else-if="request.status === 1" class="request-actions">
+                <button class="btn btn-primary" @click="openChatFromRequest(request)">
+                  开始聊天
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- 新消息弹窗 -->
+    <NotificationModal 
+      v-model="showNotificationModal" 
+      :message="notificationMessage"
+      @close="handleNotificationModalClose"
+    />
   </div>
 </template>
 
@@ -176,6 +240,16 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Loading } from '@element-plus/icons-vue';
 import { useNotification, type NotificationMessage, type NotificationContent } from '../../composables/useNotification';
+import { 
+  getChatRequestList, 
+  getChatSessionList, 
+  approveChatRequest, 
+  rejectChatRequest, 
+  type ChatRequest,
+  type ChatSession 
+} from '../../api/chat';
+import { showMessage, showConfirm } from '../../utils/message';
+import NotificationModal from '../../components/NotificationModal.vue';
 
 const router = useRouter();
 const {
@@ -183,14 +257,23 @@ const {
   isLoading,
   total,
   fetchMessageList,
+  fetchUnreadCount,
   markAsRead,
-  parseMessageContent
+  parseMessageContent,
+  initWebSocket,
+  disconnectWebSocket,
+  setOnNewMessageCallback,
+  clearOnNewMessageCallback
 } = useNotification();
 
 const currentPage = ref(1);
 const pageSize = ref(10);
-const showAppointmentDialog = ref(false);
+const showChatRequestDialog = ref(false);
 const isMobile = ref(false);
+const loadingChatRequests = ref(false);
+const chatRequests = ref<ChatRequest[]>([]);
+const showNotificationModal = ref(false);
+const notificationMessage = ref('');
 
 // 检测移动端
 function checkMobile() {
@@ -219,22 +302,51 @@ const displayMessages = computed(() => {
   return messageList.value.filter(msg => msg.title !== '新预约通知');
 });
 
-// 检查是否有未读的新预约通知
-const hasUnreadAppointments = computed(() => {
-  return appointmentNotifications.value.some(msg => msg.isRead === 0);
+// 待处理的聊天申请
+const pendingChatRequests = computed(() => {
+  return chatRequests.value.filter(r => r.status === 0);
 });
 
-// 获取最新的预约通知
-const latestAppointment = computed(() => {
-  if (appointmentNotifications.value.length === 0) return null;
-  return appointmentNotifications.value[0];
+// 所有聊天申请
+const allChatRequests = computed(() => {
+  return chatRequests.value;
 });
 
-// 获取最新预约通知的时间
-const latestAppointmentTime = computed(() => {
-  if (appointmentNotifications.value.length === 0) return '';
-  return appointmentNotifications.value[0].createTime;
+// 最新的聊天申请
+const latestChatRequest = computed(() => {
+  if (pendingChatRequests.value.length === 0) return null;
+  return pendingChatRequests.value[0];
 });
+
+// 最新的聊天申请时间
+const latestChatRequestTime = computed(() => {
+  if (pendingChatRequests.value.length === 0) return '';
+  return pendingChatRequests.value[0].createTime || '';
+});
+
+// 所有消息（包括聊天申请、预约通知、其他消息）
+const allMessages = computed(() => {
+  const messages: any[] = [];
+  // 聊天申请（如果有未处理的）
+  if (pendingChatRequests.value.length > 0) {
+    messages.push({ type: 'chat-request', id: 'chat-request' });
+  }
+  // 预约通知（逐个显示）
+  messages.push(...appointmentNotifications.value.map(msg => ({ type: 'appointment', id: `appointment-${msg.id}`, ...msg })));
+  // 其他消息
+  messages.push(...displayMessages.value);
+  return messages;
+});
+
+// 处理预约通知点击
+async function handleAppointmentClick(message: NotificationMessage) {
+  if (message.isRead === 0) {
+    await markAsRead([message.id]);
+  }
+  if (message.appointmentId) {
+    router.push('/doctor/apply');
+  }
+}
 
 // 解析消息内容
 const messageContentMap = computed(() => {
@@ -264,8 +376,30 @@ function getPreviewText(message: NotificationMessage): string {
   return parts.join(' | ');
 }
 
+// 获取显示内容（处理BROADCAST类型消息）
+function getDisplayContent(message: any): string {
+  if (!message || !message.content) {
+    return '';
+  }
+  
+  // 如果是BROADCAST类型，解析JSON并提取message字段
+  if (message.type === 'BROADCAST') {
+    try {
+      const contentObj = JSON.parse(message.content);
+      if (contentObj && typeof contentObj.message === 'string') {
+        return contentObj.message;
+      }
+    } catch (e) {
+      console.error('解析BROADCAST消息内容失败:', e);
+    }
+  }
+  
+  // 其他类型直接返回原始内容
+  return message.content;
+}
+
 // 格式化时间
-function formatTime(timeStr: string): string {
+function formatTime(timeStr?: string): string {
   if (!timeStr) return '';
   const date = new Date(timeStr);
   const now = new Date();
@@ -291,38 +425,112 @@ function formatTime(timeStr: string): string {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
-// 处理新预约通知汇总点击
-function handleAppointmentSummaryClick() {
-  // 打开对话框
-  showAppointmentDialog.value = true;
+// 处理聊天申请点击
+function handleChatRequestClick() {
+  showChatRequestDialog.value = true;
+  loadChatRequests();
 }
 
-// 处理对话框内预约通知项点击
-async function handleAppointmentItemClick(message: NotificationMessage) {
-  // 如果未读，标记为已读
-  if (message.isRead === 0) {
-    await markAsRead([message.id]);
-  }
-  
-  // 关闭对话框
-  showAppointmentDialog.value = false;
-  
-  // 跳转到预约管理页面
-  if (message.appointmentId) {
-    router.push('/doctor/apply');
-  }
-}
 
 // 处理消息点击
 async function handleMessageClick(message: NotificationMessage) {
-  // 如果未读，标记为已读
   if (message.isRead === 0) {
     await markAsRead([message.id]);
   }
-  
-  // 跳转到预约管理页面
   if (message.appointmentId) {
     router.push('/doctor/apply');
+  }
+}
+
+// 加载聊天申请列表
+async function loadChatRequests() {
+  loadingChatRequests.value = true;
+  try {
+    const list = await getChatRequestList();
+    chatRequests.value = list || [];
+  } catch (e) {
+    console.error('获取聊天申请列表失败:', e);
+    showMessage('获取聊天申请列表失败', 'error');
+  } finally {
+    loadingChatRequests.value = false;
+  }
+}
+
+
+// 同意申请
+async function approveRequest(id: number) {
+  const confirmed = await showConfirm('确认同意该聊天申请吗？');
+  if (!confirmed) return;
+
+  try {
+    const result = await approveChatRequest(id);
+    if (result === 'SUCCESS') {
+      showMessage('已同意申请，可以开始聊天了', 'success');
+      await loadChatRequests();
+    } else {
+      showMessage(result.includes('ERROR') ? result : '操作失败', 'error');
+    }
+  } catch (e: any) {
+    console.error('同意申请失败:', e);
+    showMessage(e.message || '操作失败', 'error');
+  }
+}
+
+// 拒绝申请
+async function rejectRequest(id: number) {
+  const confirmed = await showConfirm('确认拒绝该聊天申请吗？');
+  if (!confirmed) return;
+
+  try {
+    const result = await rejectChatRequest(id);
+    if (result === 'SUCCESS') {
+      showMessage('已拒绝申请', 'success');
+      await loadChatRequests();
+    } else {
+      showMessage(result.includes('ERROR') ? result : '操作失败', 'error');
+    }
+  } catch (e: any) {
+    console.error('拒绝申请失败:', e);
+    showMessage(e.message || '操作失败', 'error');
+  }
+}
+
+// 从申请打开聊天
+async function openChatFromRequest(request: ChatRequest) {
+  try {
+    // 获取聊天会话列表，查找对应的会话
+    const sessions = await getChatSessionList();
+    const session = sessions?.find(s => s.userId === request.userId);
+  if (session) {
+    router.push(`/doctor/chat/${session.id}`);
+  } else {
+      // 如果没有找到会话，跳转到聊天列表
+      router.push('/doctor/chat');
+    }
+  } catch (e) {
+    console.error('获取聊天会话失败:', e);
+    // 出错时跳转到聊天列表
+    router.push('/doctor/chat');
+  }
+}
+
+// 获取状态文本
+function getStatusText(status: number): string {
+  switch (status) {
+    case 0: return '待审核';
+    case 1: return '已同意';
+    case 2: return '已拒绝';
+    default: return '未知';
+  }
+}
+
+// 获取状态样式类
+function getStatusClass(status: number): string {
+  switch (status) {
+    case 0: return 'status-pending';
+    case 1: return 'status-approved';
+    case 2: return 'status-rejected';
+    default: return '';
   }
 }
 
@@ -343,20 +551,77 @@ function changePage(page: number) {
 // 加载消息列表
 async function loadMessages() {
   if (isMobile.value) {
-    await fetchMessageList(1, 2000); // 移动端一次性拉取足够多的数据
+    await fetchMessageList(1, 2000);
   } else {
     await fetchMessageList(currentPage.value, pageSize.value);
   }
+}
+
+// 处理新消息弹窗
+function handleNewMessage(message: NotificationMessage) {
+  console.log('收到新消息，显示弹窗:', message);
+  
+  // 解析消息内容
+  const content = parseMessageContent(message.content);
+  if (content) {
+    // 构建弹窗消息文本
+    const parts: string[] = [];
+    parts.push(message.title || '新消息');
+    if (content.userName) parts.push(`用户：${content.userName}`);
+    if (content.appDate) parts.push(`日期：${content.appDate}`);
+    if (content.timeSlot) parts.push(`时间：${content.timeSlot}`);
+    notificationMessage.value = parts.join('\n');
+  } else {
+    notificationMessage.value = message.title || '您有新消息';
+  }
+  
+  // 显示弹窗
+  showNotificationModal.value = true;
+  
+  // 刷新消息列表
+  loadMessages();
+}
+
+// 处理弹窗关闭
+function handleNotificationModalClose() {
+  showNotificationModal.value = false;
+  notificationMessage.value = '';
 }
 
 onMounted(() => {
   checkMobile();
   window.addEventListener('resize', handleResize);
   loadMessages();
+  loadChatRequests();
+  
+  // 刷新未读数量（进入页面时立即刷新，确保红点正确显示）
+  fetchUnreadCount();
+  
+  // 设置新消息回调（用于显示弹窗）- 必须在 initWebSocket 之前设置
+  setOnNewMessageCallback(handleNewMessage);
+  console.log('DoctorMessage: 已设置新消息回调');
+  
+  // 初始化WebSocket连接
+  initWebSocket();
+  
+  // 定期刷新聊天申请数据和未读数量
+  const interval = setInterval(() => {
+    loadChatRequests();
+    fetchUnreadCount(); // 定期刷新未读数量
+  }, 30000); // 每30秒刷新一次
+  
+  onUnmounted(() => {
+    clearInterval(interval);
+  });
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  // 清理WebSocket回调
+  clearOnNewMessageCallback();
+  console.log('DoctorMessage: 已清理新消息回调');
+  // 注意：不断开WebSocket连接，因为可能在其他页面也需要使用
+  // disconnectWebSocket();
 });
 </script>
 
@@ -441,17 +706,16 @@ onUnmounted(() => {
   border-width: 2px;
 }
 
-/* 新预约通知汇总样式 */
-.appointment-summary {
-  background: linear-gradient(135deg, #f0f9f8 0%, #e8f5f3 100%);
-  border-color: #72C1BB;
-  border-width: 2px;
-}
-
-.appointment-summary.unread {
+/* 聊天申请项样式 */
+.chat-request-item {
   background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%);
   border-color: #ff4d4f;
+  border-width: 2px;
   animation: pulse-border 2s infinite;
+}
+
+.chat-session-item {
+  background: #f0f9f8;
 }
 
 @keyframes pulse-border {
@@ -482,7 +746,6 @@ onUnmounted(() => {
   color: #333;
 }
 
-/* 红点指示器 */
 .red-dot {
   width: 8px;
   height: 8px;
@@ -514,7 +777,6 @@ onUnmounted(() => {
   line-height: 1.6;
 }
 
-/* 汇总信息样式 */
 .summary-info {
   display: flex;
   flex-direction: column;
@@ -561,6 +823,11 @@ onUnmounted(() => {
   flex: 1;
 }
 
+.chat-preview {
+  color: #666;
+  font-size: 14px;
+}
+
 .content-detail {
   display: flex;
   flex-direction: column;
@@ -599,7 +866,18 @@ onUnmounted(() => {
   border-radius: 10px;
 }
 
-/* 分页样式 */
+/* 新预约通知汇总样式 */
+.appointment-summary {
+  background: linear-gradient(135deg, #f0f9f8 0%, #e8f5f3 100%);
+  border-color: #72C1BB;
+  border-width: 2px;
+}
+
+.appointment-summary.unread {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%);
+  border-color: #ff4d4f;
+}
+
 .modern-pagination {
   margin-top: 20px;
   display: flex;
@@ -674,7 +952,8 @@ onUnmounted(() => {
   backdrop-filter: blur(4px);
 }
 
-.appointment-dialog {
+.appointment-dialog,
+.chat-request-dialog {
   background: white;
   border-radius: 12px;
   width: 100%;
@@ -733,62 +1012,165 @@ onUnmounted(() => {
   padding: 60px 20px;
 }
 
-.appointment-list {
+.appointment-list,
+.chat-request-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.appointment-item {
+.appointment-item,
+.chat-request-item-dialog {
   position: relative;
   padding: 16px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s;
   background: #fafafa;
 }
 
-.appointment-item:hover {
-  background: #f0f0f0;
-  border-color: #72C1BB;
-  box-shadow: 0 2px 8px rgba(114, 193, 187, 0.1);
-}
-
-.appointment-item.unread {
-  background: #fff;
-  border-color: #72C1BB;
+.chat-request-item-dialog.pending {
+  background: #fff5f5;
+  border-color: #ff4d4f;
   border-width: 2px;
 }
 
-.appointment-header {
+.request-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
 }
 
-.appointment-title-wrapper {
+.user-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
-.appointment-title {
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #72C1BB;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-name {
   font-size: 16px;
   font-weight: 600;
   color: #333;
 }
 
-.appointment-time {
+.request-time {
   font-size: 12px;
   color: #999;
 }
 
-.appointment-content {
+.request-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-approved {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-rejected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.request-message {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.message-label {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.message-content {
   font-size: 14px;
-  color: #666;
+  color: #333;
   line-height: 1.6;
+}
+
+.request-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-success {
+  background: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #218838;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+.btn-primary {
+  background: #72C1BB;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #5aa9a3;
 }
 
 /* 移动端适配 */
@@ -836,7 +1218,8 @@ onUnmounted(() => {
     padding: 10px;
   }
 
-  .appointment-dialog {
+  .appointment-dialog,
+  .chat-request-dialog {
     max-height: 90vh;
     border-radius: 8px;
   }
@@ -851,16 +1234,6 @@ onUnmounted(() => {
 
   .dialog-body {
     padding: 15px;
-  }
-
-  .appointment-item {
-    padding: 12px;
-  }
-
-  .appointment-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
   }
 }
 </style>

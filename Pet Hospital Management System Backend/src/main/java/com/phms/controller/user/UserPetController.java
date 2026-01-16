@@ -6,8 +6,6 @@ import com.phms.pojo.User;
 import com.phms.service.PetDailyService;
 import com.phms.service.PetService;
 import com.phms.utils.UserContext;
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

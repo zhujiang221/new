@@ -88,9 +88,6 @@ public class MedicineRecordController {
         }
         
         // 验证权限：只有医生(roleId=2)可以开药
-        if (user == null) {
-            return "LGINOUT";
-        }
         Integer roleId = userService.getUserRoleId(user.getId());
         if (roleId == null) {
             roleId = 3; // 默认普通用户
@@ -145,9 +142,6 @@ public class MedicineRecordController {
         }
         
         // 验证权限：医生(roleId=2)或管理员(roleId=1)可以删除
-        if (user == null) {
-            return "LGINOUT";
-        }
         Integer roleId = userService.getUserRoleId(user.getId());
         if (roleId == null) {
             roleId = 3; // 默认普通用户

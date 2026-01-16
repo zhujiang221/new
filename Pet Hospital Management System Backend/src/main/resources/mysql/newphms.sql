@@ -312,6 +312,64 @@ CREATE TABLE `user` (
   `username` varchar(100) NOT NULL,
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
+
+
+-- 聊天消息表
+DROP TABLE IF EXISTS `chat_message`;
+CREATE TABLE `chat_message` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `session_id` bigint(20) NOT NULL COMMENT '会话ID',
+  `sender_id` bigint(20) NOT NULL COMMENT '发送者ID',
+  `receiver_id` bigint(20) NOT NULL COMMENT '接收者ID',
+  `message_type` varchar(20) NOT NULL DEFAULT 'text' COMMENT '消息类型（text=文字, emoji=表情, image=图片, file=文件）',
+  `content` text COMMENT '消息内容（文字内容或文件路径）',
+  `is_read` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否已读（0=未读, 1=已读）',
+  `is_revoked` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否已撤回（0=未撤回, 1=已撤回）',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_session_id` (`session_id`) USING BTREE,
+  KEY `idx_sender_id` (`sender_id`) USING BTREE,
+  KEY `idx_receiver_id` (`receiver_id`) USING BTREE,
+  KEY `idx_is_read` (`is_read`) USING BTREE,
+  KEY `idx_create_time` (`create_time`) USING BTREE,
+  KEY `idx_is_revoked` (`is_revoked`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=116 DEFAULT CHARSET=utf8 COMMENT='聊天消息表';
+
+-- 聊天申请表
+DROP TABLE IF EXISTS `chat_request`;
+CREATE TABLE `chat_request` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `user_id` BIGINT(20) NOT NULL COMMENT '用户ID',
+  `doctor_id` BIGINT(20) NOT NULL COMMENT '医生ID',
+  `status` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '状态（0=待审核, 1=已同意, 2=已拒绝）',
+  `request_message` VARCHAR(500) DEFAULT NULL COMMENT '申请留言',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_user_id` (`user_id`) USING BTREE,
+  KEY `idx_doctor_id` (`doctor_id`) USING BTREE,
+  KEY `idx_status` (`status`) USING BTREE,
+  KEY `idx_create_time` (`create_time`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='聊天申请表';
+
+-- 聊天会话表
+DROP TABLE IF EXISTS `chat_session`;
+CREATE TABLE `chat_session` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `user_id` BIGINT(20) NOT NULL COMMENT '用户ID',
+  `doctor_id` BIGINT(20) NOT NULL COMMENT '医生ID',
+  `request_id` BIGINT(20) DEFAULT NULL COMMENT '关联的申请ID',
+  `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态（0=已关闭, 1=进行中）',
+  `last_message_time` TIMESTAMP NULL DEFAULT NULL COMMENT '最后消息时间',
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  KEY `idx_user_id` (`user_id`) USING BTREE,
+  KEY `idx_doctor_id` (`doctor_id`) USING BTREE,
+  KEY `idx_request_id` (`request_id`) USING BTREE,
+  KEY `idx_status` (`status`) USING BTREE,
+  KEY `idx_last_message_time` (`last_message_time`) USING BTREE,
+  UNIQUE KEY `uk_user_doctor` (`user_id`, `doctor_id`) USING BTREE COMMENT '用户和医生唯一会话'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='聊天会话表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

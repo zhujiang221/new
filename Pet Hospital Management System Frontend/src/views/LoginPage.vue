@@ -80,11 +80,15 @@
             />
             <div class="captcha-image-wrapper" @click="refreshCaptcha">
               <img 
+                v-if="captchaImageUrl"
                 :src="captchaImageUrl" 
                 alt="验证码" 
                 class="captcha-image"
                 @error="handleCaptchaError"
               />
+              <div v-else class="captcha-placeholder">
+                点击获取验证码
+              </div>
               <div class="captcha-refresh-hint">点击刷新</div>
             </div>
           </div>
@@ -290,42 +294,63 @@ const errors = reactive({
 });
 
 const loading = ref(false);
-const captchaImageUrl = ref('');
+const captchaImageUrl = ref(''); // 初始化为空，避免自动加载错误URL
 const captchaId = ref('');
+const captchaLoading = ref(false); // 添加加载状态，避免重复请求
 
 // 刷新验证码
 async function refreshCaptcha() {
+  // 如果正在加载，避免重复请求
+  if (captchaLoading.value) {
+    return;
+  }
+  
+  captchaLoading.value = true;
   try {
     const resp = await http.get('/captcha');
     const data = resp.data;
     
     if (data.result === 'success' && data.captchaId && data.image) {
       captchaId.value = data.captchaId;
-      captchaImageUrl.value = data.image; // base64编码的图片
+      captchaImageUrl.value = data.image; // base64编码的图片，格式为 "data:image/jpeg;base64,..."
       form.captcha = '';
       clearError('captcha');
     } else {
-      console.error('获取验证码失败:', data.message);
+      console.error('获取验证码失败:', data.message || '未知错误');
       showMessage('获取验证码失败，请刷新页面重试', 'error');
+      captchaImageUrl.value = ''; // 失败时清空图片URL
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error('获取验证码异常:', e);
-    showMessage('获取验证码失败，请刷新页面重试', 'error');
+    const errorMsg = e?.response?.data?.message || e?.message || '网络错误';
+    showMessage(`获取验证码失败: ${errorMsg}，请刷新页面重试`, 'error');
+    captchaImageUrl.value = ''; // 失败时清空图片URL
+  } finally {
+    captchaLoading.value = false;
   }
 }
 
 // 处理验证码图片加载错误
 function handleCaptchaError() {
   console.error('验证码图片加载失败');
-  // 延迟后重试
-  setTimeout(() => {
-    refreshCaptcha();
-  }, 500);
+  // 如果图片URL存在但加载失败，可能是base64数据损坏，重新获取
+  if (captchaImageUrl.value) {
+    captchaImageUrl.value = ''; // 清空当前图片
+    // 延迟后重试，避免频繁请求
+    setTimeout(() => {
+      if (!captchaLoading.value) {
+        refreshCaptcha();
+      }
+    }, 1000);
+  }
 }
 
-// 页面加载时获取验证码
+// 页面加载时获取验证码（这是正常行为，登录页应该自动显示验证码）
 onMounted(() => {
-  refreshCaptcha();
+  // 延迟一点加载验证码，确保页面已完全渲染
+  setTimeout(() => {
+    refreshCaptcha();
+  }, 100);
   initParticles();
   // 初始化鼠标位置在屏幕中心
   if (containerRef.value) {
@@ -1068,6 +1093,9 @@ function goForgetPassword() {
   transition: all 0.3s;
   flex-shrink: 0;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .captcha-image-wrapper:hover {
@@ -1075,11 +1103,27 @@ function goForgetPassword() {
   box-shadow: 0 0 0 2px rgba(103, 194, 58, 0.1);
 }
 
+.captcha-image-wrapper.loading {
+  cursor: wait;
+}
+
 .captcha-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.captcha-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+  padding: 0 4px;
 }
 
 .captcha-refresh-hint {

@@ -58,8 +58,11 @@ export default defineConfig({
         target: PROXY_TARGET,
         changeOrigin: true
       },
-      // Admin APIs（排除前端路由）
-      '^/admin/(?!roles$|pages$|users$|user-role$).*': {
+      // Admin APIs（排除前端路由页面）
+      // 排除的前端路由：users, pets, diagnosis, apply, free-time, schedule, service-type, 
+      // notices, assess, standards, pet-daily, tj-apply, tj-daily, medicine, medicine-record, 
+      // chat, broadcast, appointment-type
+      '^/admin/(?!roles$|pages$|users$|user-role$|pets$|diagnosis$|apply$|free-time$|schedule$|service-type$|notices$|assess$|standards$|pet-daily$|tj-apply$|tj-daily$|medicine$|medicine-record$|chat$|broadcast$|appointment-type$).*': {
         target: PROXY_TARGET,
         changeOrigin: true
       },
@@ -101,17 +104,22 @@ export default defineConfig({
         target: PROXY_TARGET,
         changeOrigin: true
       },
-      // 2. 匹配用户信息相关API（无子路径，直接是 /user/{action}）
+      // 2. 匹配用户主页相关API（/user/home/*）
+      '/user/home/': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      // 3. 匹配用户信息相关API（无子路径，直接是 /user/{action}）
       '^/user/(checkEmail|updatePassword|checkUserPassword|updateUser|getUserById|getCurrentUser|getMessage)$': {
         target: PROXY_TARGET,
         changeOrigin: true
       },
-      // 3. 匹配其他所有 /user/* 路径，但排除前端路由页面
+      // 4. 匹配其他所有 /user/* 路径，但排除前端路由页面
       // 前端路由页面（精确匹配，不包含子路径）：
       // /user/pets, /user/apply, /user/apply-flow, /user/standards, /user/pet-daily, 
       // /user/notices, /user/diagnosis, /user/tj-apply, /user/tj-daily, 
-      // /user/assess, /user/free-time, /user/profile, /user/change-password, /user/message, /user/more
-      '^/user/(?!pets$|apply$|apply-flow$|standards$|pet-daily$|notices$|diagnosis$|tj-apply$|tj-daily$|assess$|free-time$|profile$|change-password$|message$|more$).+': {
+      // /user/assess, /user/free-time, /user/profile, /user/change-password, /user/message, /user/more, /user/mine
+      '^/user/(?!pets$|apply$|apply-flow$|standards$|pet-daily$|notices$|diagnosis$|tj-apply$|tj-daily$|assess$|free-time$|profile$|change-password$|message$|more$|mine$).+': {
         target: PROXY_TARGET,
         changeOrigin: true
       },
@@ -121,7 +129,15 @@ export default defineConfig({
         changeOrigin: true
       },
       // Doctor APIs（排除前端路由）
-      '^/doctor/(?!apply$|diagnosis$|pet-daily$|notices$|standards$|tj-apply$|tj-daily$|free-time$|message$|medicine$|medicine-record$|prescribe-medicine$|schedule$|service-type$|more$).*': {
+      // 排除的前端路由：apply, diagnosis, pet-daily, notices, standards, tj-apply, tj-daily, 
+      // free-time, message, medicine, medicine-record, prescribe-medicine, schedule, 
+      // service-type, more, chat, chat/request, chat/:id
+      '^/doctor/(?!apply$|diagnosis$|pet-daily$|notices$|standards$|tj-apply$|tj-daily$|free-time$|message$|medicine$|medicine-record$|prescribe-medicine$|schedule$|service-type$|more$|chat$|chat/).*': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      // Chat APIs
+      '/api/chat': {
         target: PROXY_TARGET,
         changeOrigin: true
       },
@@ -155,6 +171,11 @@ export default defineConfig({
       },
       // File upload
       '/upload': {
+        target: PROXY_TARGET,
+        changeOrigin: true
+      },
+      // File access (for uploaded files)
+      '/file': {
         target: PROXY_TARGET,
         changeOrigin: true
       },

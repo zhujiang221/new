@@ -29,4 +29,14 @@ public interface NotificationMessageService {
      * 登录时检查未读消息（返回汇总信息）
      */
     Object checkOnLogin(Long receiverId);
+    
+    /**
+     * 批量发送通知给指定角色的所有用户
+     * @param roleIds 角色ID列表（1=管理员, 2=医生, 3=用户）
+     * @param title 通知标题
+     * @param content 通知内容
+     * @param senderId 发送者ID（管理员ID）
+     * @return 发送成功的数量
+     */
+    int sendBroadcastNotification(List<Integer> roleIds, String title, String content, Long senderId);
 }

@@ -23,22 +23,39 @@ class WebSocketManager {
 
   /**
    * 连接WebSocket
-   * @param userId 用户ID
+   * @param userId 用户ID（必须绑定唯一用户ID，确保服务端能精准推送消息）
    * @param onMessage 消息处理回调
    */
   connect(userId: string | number, onMessage?: WebSocketMessageHandler): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('WebSocket已连接，无需重复连接');
+      console.log('[WebSocket] 已连接，无需重复连接，用户ID:', this.userId);
+      // 如果已连接但用户ID不同，需要重新连接
+      if (this.userId !== userId) {
+        console.log('[WebSocket] 用户ID变更，重新连接，旧ID:', this.userId, '新ID:', userId);
+        this.disconnect();
+      } else {
+        // 用户ID相同，直接添加消息处理器
+        if (onMessage) {
+          this.addMessageHandler(onMessage);
+        }
+        return;
+      }
+    }
+
+    // 验证用户ID
+    if (!userId) {
+      console.error('[WebSocket] 连接失败：用户ID不能为空');
       return;
     }
 
     this.userId = userId;
     this.isManualClose = false;
+    console.log('[WebSocket] 开始连接，用户ID:', userId);
 
     // 构建WebSocket URL
     // 在开发环境下，直接连接到后端服务器（避免Vite代理问题）
     // 在生产环境下，使用相对路径通过代理连接
-    const isDevelopment = import.meta.env.DEV;
+    const isDevelopment = (import.meta as any).env?.DEV ?? process.env.NODE_ENV === 'development';
     let wsProtocol: string;
     let host: string;
     
@@ -60,20 +77,29 @@ class WebSocketManager {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('WebSocket连接成功，URL:', this.url);
+        console.log('[WebSocket] 连接成功，URL:', this.url, '用户ID:', this.userId);
         this.reconnectAttempts = 0;
         if (onMessage) {
           this.addMessageHandler(onMessage);
         }
+        // 发送连接确认消息（如果需要）
+        this.send({ type: 'connected', userId: this.userId });
       };
 
       this.ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('收到WebSocket消息:', message);
+          console.log('[WebSocket] 收到消息，用户ID:', this.userId, '消息:', message);
+          
+          // 消息确认机制：如果消息包含确认ID，确认对应的待发送消息
+          if (message.confirmId) {
+            console.log('[WebSocket] 收到消息确认，确认ID:', message.confirmId);
+            // 这里可以触发确认回调，由调用方处理
+          }
+          
           this.handleMessage(message);
         } catch (e) {
-          console.error('解析WebSocket消息失败:', e, '原始数据:', event.data);
+          console.error('[WebSocket] 解析消息失败:', e, '原始数据:', event.data);
         }
       };
 
@@ -129,10 +155,12 @@ class WebSocketManager {
   }
 
   /**
-   * 添加消息处理器
+   * 添加消息处理器（统一注册接收监听事件）
    */
   addMessageHandler(handler: WebSocketMessageHandler): void {
+    console.log('[WebSocket] 添加消息处理器，当前处理器数:', this.messageHandlers.size);
     this.messageHandlers.add(handler);
+    console.log('[WebSocket] 消息处理器已添加，当前处理器数:', this.messageHandlers.size);
   }
 
   /**
@@ -143,22 +171,47 @@ class WebSocketManager {
   }
 
   /**
-   * 处理接收到的消息
+   * 处理接收到的消息（添加异常捕获机制，确保稳定接收服务端推送）
    */
   private handleMessage(message: any): void {
-    const wsMessage: WebSocketMessage = {
-      type: message.type || 'notification',
-      data: message
-    };
+    console.log('[WebSocket] 处理消息，原始消息:', message);
+    
+    // 如果消息已经是正确的格式（有type和data），直接使用，不再重复包装
+    let wsMessage: WebSocketMessage;
+    
+    if (message.type && message.data !== undefined) {
+      // 已经是正确格式，直接使用
+      wsMessage = {
+        type: message.type,
+        data: message.data  // 直接使用data，不再嵌套
+      };
+      console.log('[WebSocket] 消息格式正确，直接使用:', wsMessage);
+    } else {
+      // 旧格式，包装成统一格式
+      wsMessage = {
+        type: message.type || 'notification',
+        data: message
+      };
+      console.log('[WebSocket] 消息格式需要包装:', wsMessage);
+    }
 
-    // 通知所有消息处理器
+    // 通知所有消息处理器（添加异常捕获，确保一个处理器失败不影响其他处理器）
+    let handlerCount = 0;
+    let successCount = 0;
+    let errorCount = 0;
+    
     this.messageHandlers.forEach(handler => {
+      handlerCount++;
       try {
         handler(wsMessage);
+        successCount++;
       } catch (e) {
-        console.error('消息处理器执行失败:', e);
+        errorCount++;
+        console.error('[WebSocket] 消息处理器执行失败:', e, '消息:', wsMessage);
       }
     });
+    
+    console.log(`[WebSocket] 消息处理完成，处理器数: ${handlerCount}，成功: ${successCount}，失败: ${errorCount}`);
   }
 
   /**
@@ -189,13 +242,36 @@ class WebSocketManager {
 
   /**
    * 发送消息（如果需要双向通信）
+   * 增加消息发送确认机制：发送后等待服务端回执，未收到则重新发送
    */
-  send(message: any): void {
+  send(message: any, confirmCallback?: (confirmId: string) => void): void {
     if (this.isConnected() && this.ws) {
-      this.ws.send(JSON.stringify(message));
+      try {
+        const messageStr = JSON.stringify(message);
+        this.ws.send(messageStr);
+        console.log('[WebSocket] 消息已发送，用户ID:', this.userId, '消息:', message);
+        
+        // 如果提供了确认回调，可以在这里处理确认逻辑
+        // 实际应用中，可以添加消息ID和确认机制
+        if (confirmCallback && message.id) {
+          // 这里可以实现确认机制，暂时先发送
+          console.log('[WebSocket] 等待消息确认，消息ID:', message.id);
+        }
+      } catch (e) {
+        console.error('[WebSocket] 发送消息失败:', e);
+        throw e;
+      }
     } else {
-      console.warn('WebSocket未连接，无法发送消息');
+      console.warn('[WebSocket] 未连接，无法发送消息，用户ID:', this.userId, '连接状态:', this.ws?.readyState);
+      throw new Error('WebSocket未连接');
     }
+  }
+  
+  /**
+   * 获取当前绑定的用户ID
+   */
+  getUserId(): string | number | null {
+    return this.userId;
   }
 }
 

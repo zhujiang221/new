@@ -7,7 +7,9 @@ import com.phms.pojo.Role;
 import com.phms.pojo.User;
 import com.phms.pojo.UserParameter;
 import com.phms.service.*;
+import com.phms.service.NotificationMessageService;
 import com.phms.utils.MD5;
+import com.phms.utils.UserContext;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
@@ -45,6 +47,10 @@ public class Adminontroller {
 	private UserMapper userMapper;
 	@Autowired
 	private ResultMap resultMap;
+	@Autowired
+	private NotificationMessageService notificationMessageService;
+	@Autowired
+	private UserContext userContext;
 
 	private final Logger logger = LoggerFactory.getLogger(Adminontroller.class);
 
@@ -530,6 +536,75 @@ public class Adminontroller {
 			logger.error("重置密码异常: userId={}", userId, e);
 			TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
 			return "ERR:" + (e.getMessage() != null ? e.getMessage() : "系统异常");
+		}
+	}
+
+	/**
+	 * 发送全局通知
+	 * @param title 通知标题
+	 * @param content 通知内容
+	 * @param roleIds 角色ID列表（1=管理员, 2=医生, 3=用户），可以传多个，用逗号分隔，如"2,3"表示发送给医生和用户
+	 * @return ResultMap
+	 */
+	@ResponseBody
+	@RequestMapping(value = "/sendBroadcastNotification", method = org.springframework.web.bind.annotation.RequestMethod.POST)
+	public ResultMap sendBroadcastNotification(
+			@RequestParam("title") String title, 
+			@RequestParam("content") String content, 
+			@RequestParam("roleIds") String roleIds) {
+		try {
+			// 验证当前用户是否为管理员
+			User currentUser = userContext.getCurrentUser();
+			if (currentUser == null) {
+				return resultMap.fail().message("用户未登录");
+			}
+			if (currentUser.getRole() == null || currentUser.getRole() != 1) {
+				return resultMap.fail().message("只有管理员可以发送全局通知");
+			}
+			
+			// 验证参数
+			if (title == null || title.trim().isEmpty()) {
+				return resultMap.fail().message("通知标题不能为空");
+			}
+			if (content == null || content.trim().isEmpty()) {
+				return resultMap.fail().message("通知内容不能为空");
+			}
+			if (roleIds == null || roleIds.trim().isEmpty()) {
+				return resultMap.fail().message("请至少选择一个角色");
+			}
+			
+			// 解析角色ID列表
+			String[] roleIdArray = roleIds.split(",");
+			java.util.List<Integer> roleIdList = new java.util.ArrayList<>();
+			for (String roleIdStr : roleIdArray) {
+				try {
+					Integer roleId = Integer.parseInt(roleIdStr.trim());
+					if (roleId >= 1 && roleId <= 3) {
+						roleIdList.add(roleId);
+					} else {
+						logger.warn("无效的角色ID: {}", roleId);
+					}
+				} catch (NumberFormatException e) {
+					logger.warn("无法解析角色ID: {}", roleIdStr);
+				}
+			}
+			
+			if (roleIdList.isEmpty()) {
+				return resultMap.fail().message("请至少选择一个有效的角色（1=管理员, 2=医生, 3=用户）");
+			}
+			
+			// 发送全局通知
+			int successCount = notificationMessageService.sendBroadcastNotification(
+				roleIdList, title.trim(), content.trim(), currentUser.getId());
+			
+			logger.info("管理员 {} 发送全局通知成功 - 角色: {}, 成功数量: {}", 
+				currentUser.getId(), roleIds, successCount);
+			
+			return resultMap.success().message("全局通知发送成功，共发送给 " + successCount + " 个用户");
+			
+		} catch (Exception e) {
+			logger.error("发送全局通知异常", e);
+			return resultMap.fail().message("发送全局通知失败: " + e.getMessage());
 		}
 	}
 }

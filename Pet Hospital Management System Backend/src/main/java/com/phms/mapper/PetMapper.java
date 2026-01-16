@@ -98,4 +98,9 @@ public interface PetMapper {
     List<Pet> getAllByLimit(Pet po);
 
     int countAllByLimit(Pet po);
+
+    /**
+     * 根据用户ID获取所有宠物ID列表
+     */
+    List<Long> getPetIdsByUserId(@Param("userId") Long userId);
 }

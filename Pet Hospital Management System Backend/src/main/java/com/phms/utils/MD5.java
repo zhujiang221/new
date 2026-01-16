@@ -27,6 +27,9 @@ public class MD5 {
 		}
 		// String.getBytes() never returns null in Java
 		byte[] bytes = text.getBytes();
+		if (bytes == null) {
+			throw new IllegalStateException("Failed to get bytes from text");
+		}
 		return DigestUtils.md5DigestAsHex(bytes);
 	}
 	

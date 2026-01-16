@@ -405,4 +405,12 @@
       </if>
     </where>
   </select>
+
+  <select id="getPetIdsByUserId"
+          parameterType="java.lang.Long"
+          resultType="java.lang.Long">
+    SELECT id
+    FROM `pet`
+    WHERE user_id = #{userId}
+  </select>
 </mapper>

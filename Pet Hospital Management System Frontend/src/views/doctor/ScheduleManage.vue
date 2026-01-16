@@ -403,14 +403,12 @@ async function applyTemplate() {
 
     // 使用新的 applyTemplate 接口，后端会自动删除旧排班并添加新排班
     if (newSchedules.length > 0) {
-      // 使用 axios 直接发送 JSON 数据，绕过 http.ts 的表单转换
+      // 使用 http 实例发送 JSON 数据，确保自动添加 Authorization 头
       try {
-        const resp = await axios.post(`/doctor/schedule/applyTemplate?doctorId=${doctorId}`, newSchedules, {
+        const resp = await http.post(`/doctor/schedule/applyTemplate?doctorId=${doctorId}`, newSchedules, {
           headers: {
             'Content-Type': 'application/json'
-          },
-          withCredentials: true,
-          timeout: 10000
+          }
         });
         
         if (resp.data === 'SUCCESS') {

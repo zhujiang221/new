@@ -226,22 +226,41 @@ export function useNotification() {
   function handleWebSocketMessage(message: WebSocketMessage) {
     console.log('handleWebSocketMessage收到消息:', message);
     
+    // 如果是聊天消息，不在这里处理，让聊天组件自己处理
+    if (message.type === 'chat') {
+      console.log('收到聊天消息，跳过通知消息处理');
+      return;
+    }
+    
     // 检查消息类型和数据
-    // message.data 是后端发送的 NotificationMessage 对象
-    // 如果 message.data 不存在，可能是消息格式不同，尝试使用 message 本身
+    // 后端发送的格式：{"type": "notification", "data": NotificationMessage}
+    // websocket.ts 的 handleMessage 会把整个 message 作为 data，所以实际结构是：
+    // {type: "notification", data: {type: "notification", data: NotificationMessage}}
     let messageData: any = null;
     
     if (message.data) {
-      messageData = message.data;
-    } else if (message && typeof message === 'object' && 'receiverId' in message) {
-      // 如果消息本身就是 NotificationMessage 对象
-      messageData = message;
+      // 如果 message.data 有 data 字段，说明是嵌套结构，需要提取内层的 data
+      if (message.data.data && typeof message.data.data === 'object' && ('receiverId' in message.data.data || 'id' in message.data.data)) {
+        messageData = message.data.data;
+        console.log('从嵌套结构中提取消息数据:', messageData);
+      } else if (message.data && typeof message.data === 'object' && ('receiverId' in message.data || 'id' in message.data)) {
+        // 如果 message.data 本身就是 NotificationMessage 对象（有 receiverId 或 id 字段）
+        messageData = message.data;
+        console.log('直接使用 message.data 作为消息数据:', messageData);
+      }
     }
     
     if (messageData) {
-      console.log('解析到消息数据:', messageData);
+      console.log('最终解析到的消息数据:', messageData);
       
-      // 收到新消息，增加未读数量
+      // 检查是否是聊天消息（通过title判断）
+      const messageTitle = messageData.title || '';
+      if (messageTitle && (messageTitle.includes('聊天') && messageTitle !== '聊天申请')) {
+        console.log('收到聊天消息，跳过通知消息处理');
+        return;
+      }
+      
+      // 收到新消息，增加未读数量（只处理通知消息）
       unreadCount.value++;
       
       // 将新消息添加到列表顶部（如果有ID）
@@ -257,9 +276,14 @@ export function useNotification() {
       
       // 触发新消息回调（用于显示弹窗）
       // 无论是否有ID，都应该显示弹窗
+      console.log('检查回调函数，onNewMessageCallback:', onNewMessageCallback);
       if (onNewMessageCallback) {
         console.log('触发弹窗回调，消息数据:', messageData);
-        onNewMessageCallback(messageData as NotificationMessage);
+        try {
+          onNewMessageCallback(messageData as NotificationMessage);
+        } catch (e) {
+          console.error('执行回调函数失败:', e);
+        }
       } else {
         console.warn('onNewMessageCallback未设置，无法显示弹窗');
       }

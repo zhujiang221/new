@@ -73,11 +73,6 @@ public class DoctorServiceTypeController {
             return "NOT_LOGIN";
         }
         
-        if (user == null) {
-            logger.warn("设置服务类型失败：用户未登录");
-            return "NO_LOGIN";
-        }
-        
         // 如果不是管理员，只能设置自己的
         if (user.getRole() == null || user.getRole() != 1) {
             doctorId = user.getId();

@@ -12,32 +12,34 @@
         >
           <
         </button>
-        <button 
-          v-if="!isMobile" 
-          class="menu-toggle-desktop" 
-          @click="toggleCollapse"
-          :title="isCollapsed ? '展开导航栏' : '收起导航栏'"
-        >
-          <span class="toggle-icon" :class="{ 'collapsed': isCollapsed }">
-            <span class="line"></span>
-            <span class="line"></span>
-            <span class="line"></span>
-          </span>
-        </button>
         <img src="/imgs/catFace.png" alt="logo" />
-        <span class="title">
-          {{ isMobile && !showMainPageView ? (route.meta?.title as string || '详情') : '宠物医院管理系统' }}
-        </span>
+        <div class="title-wrapper">
+          <span class="title">
+            {{ isMobile && !showMainPageView ? (route.meta?.title as string || '详情') : '宠物医院管理系统' }}
+          </span>
+          <span v-if="!isMobile || (isMobile && !showMainPageView)" class="subtitle">医生端</span>
+        </div>
       </div>
       <div class="user-info" v-if="!isMobile">
-        <span class="username">{{ userInfo.name || '医生' }}</span>
-        <!-- 消息按钮 -->
-        <div class="message-button" @click="goToMessage" title="消息">
-          <span class="message-icon">💬</span>
+        <!-- 通知按钮 -->
+        <div class="notification-button" @click="goToMessage" title="通知">
+          <span class="notification-icon">🔔</span>
           <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
         </div>
-        <el-dropdown @command="handleCommand" trigger="click">
-          <span class="dropdown-trigger">▼</span>
+        <!-- 聊天按钮 -->
+        <div class="help-button" @click="goToChat" title="聊天">
+          <span class="help-icon">💬</span>
+          <span v-if="chatUnreadCount > 0" class="chat-badge">
+            {{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}
+          </span>
+        </div>
+        <!-- 用户头像/信息 -->
+        <div class="user-avatar-button" @click="goToMine" title="医生主页">
+          <span class="user-avatar-icon">👤</span>
+        </div>
+        <!-- 下拉菜单 -->
+        <el-dropdown @command="handleCommand" trigger="click" placement="bottom-end">
+          <span style="display: none;"></span>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">修改个人信息</el-dropdown-item>
@@ -46,9 +48,24 @@
           </template>
         </el-dropdown>
       </div>
-      <!-- 移动端只显示用户名，不显示下拉菜单 -->
+      <!-- 移动端只显示用户名和通知按钮 -->
       <div class="user-info-mobile" v-if="isMobile">
-        <span class="username">{{ userInfo.name || '医生' }}</span>
+        <!-- 通知按钮 -->
+        <div class="notification-button-mobile" @click="goToMessage" title="通知">
+          <span class="notification-icon">🔔</span>
+          <span v-if="unreadCount > 0" class="notification-dot"></span>
+        </div>
+        <!-- 聊天按钮 -->
+        <div class="chat-button-mobile" @click="goToChat" title="聊天">
+          <span class="chat-icon">💬</span>
+          <span v-if="chatUnreadCount > 0" class="chat-badge">
+            {{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}
+          </span>
+        </div>
+        <!-- 用户头像 -->
+        <div class="user-avatar-button-mobile" @click="goToMine" title="医生主页">
+          <span class="user-avatar-icon">👤</span>
+        </div>
       </div>
     </div>
 
@@ -56,82 +73,72 @@
       <!-- 电脑端左侧导航栏 -->
       <div 
         v-if="!isMobile"
-        class="left-menu" 
-        :class="{ 'collapsed': isCollapsed }"
+        class="left-menu"
       >
         <div
-          v-for="group in menuGroups"
-          :key="group.title"
-          class="menu-group"
+          v-for="item in menuItems"
+          :key="item.path"
+          class="menu-item"
+          :class="{ active: currentPath === item.path || (item.path === '/doctor' && currentPath === '/doctor') }"
+          @click="navigate(item.path)"
         >
-          <div
-            class="menu-title"
-            :class="{ active: expandedGroup === group.title }"
-            @click="toggleGroup(group.title)"
-          >
-            <span class="menu-icon" v-if="group.icon">{{ group.icon }}</span>
-            <span class="menu-text" v-show="!isCollapsed">{{ group.title }}</span>
-            <span class="arrow" v-show="!isCollapsed">{{ expandedGroup === group.title ? '▼' : '▶' }}</span>
-          </div>
-          <ul v-show="expandedGroup === group.title && !isCollapsed" class="menu-list">
-            <li
-              v-for="item in group.items"
-              :key="item.path"
-              :class="{ selected: currentPath === item.path }"
-              @click="navigate(item.path)"
-            >
-              {{ item.label }}
-            </li>
-          </ul>
+          <span class="menu-icon">{{ item.icon }}</span>
+          <span class="menu-text">{{ item.label }}</span>
         </div>
       </div>
 
-      <!-- 移动端底部导航栏（仅在主页面显示） -->
-      <div v-if="isMobile && showMainPageView" class="bottom-nav">
+      <!-- 移动端底部导航栏（在主页面相关路由下显示） -->
+      <div v-if="shouldShowBottomNav" class="bottom-nav">
         <div 
           class="nav-item" 
           :class="{ active: currentTab === 'home' }"
           @click="switchTab('home')"
         >
           <div class="nav-icon">🏠</div>
-          <div class="nav-label">主页</div>
+          <div class="nav-label">首页</div>
         </div>
         <div 
           class="nav-item" 
-          :class="{ active: currentTab === 'message' }"
-          @click="switchTab('message')"
+          :class="{ active: currentTab === 'apply' }"
+          @click="switchTab('apply')"
         >
-          <div class="nav-icon">
-            💬
-            <span v-if="unreadCount > 0" class="notification-badge"></span>
-          </div>
-          <div class="nav-label">消息</div>
+          <div class="nav-icon">📅</div>
+          <div class="nav-label">预约管理</div>
         </div>
         <div 
           class="nav-item" 
-          :class="{ active: currentTab === 'mine' }"
-          @click="switchTab('mine')"
+          :class="{ active: currentTab === 'health' }"
+          @click="switchTab('health')"
         >
-          <div class="nav-icon">👤</div>
-          <div class="nav-label">我的</div>
+          <div class="nav-icon">❤️</div>
+          <div class="nav-label">宠物健康史</div>
+        </div>
+        <div 
+          class="nav-item" 
+          :class="{ active: currentTab === 'schedule' }"
+          @click="switchTab('schedule')"
+        >
+          <div class="nav-icon">⏰</div>
+          <div class="nav-label">排班管理</div>
         </div>
       </div>
 
       <!-- 内容区域 -->
-      <div class="content-area" :class="{ 'with-bottom-nav': isMobile && showMainPageView }">
+      <div class="content-area" :class="{ 'with-bottom-nav': shouldShowBottomNav }">
         <!-- 移动端显示核心页面或路由内容 -->
         <template v-if="isMobile">
-          <!-- 如果在主页面（home/mine/more），显示对应的主页面组件 -->
+          <!-- 如果在主页面，显示对应的主页面组件 -->
           <template v-if="showMainPageView">
             <DoctorHome v-if="currentTab === 'home'" @navigate="handleChildNavigate" />
-            <DoctorMine v-else-if="currentTab === 'mine'" />
-            <DoctorMessage v-else-if="currentTab === 'message'" />
           </template>
           <!-- 如果在子路由页面，显示路由内容 -->
           <router-view v-else />
         </template>
-        <!-- 电脑端显示路由内容 -->
-        <router-view v-else />
+        <!-- 电脑端：如果是首页路径，显示主页组件，否则显示路由内容 -->
+        <template v-else>
+          <DoctorHome v-if="route.path === '/doctor'" @navigate="handleChildNavigate" />
+          <router-view v-else />
+        </template>
       </div>
     </div>
 
@@ -198,14 +205,16 @@ import '../../assets/notification.css';
 import DoctorHome from './DoctorHome.vue';
 import DoctorMine from './DoctorMine.vue';
 import DoctorMessage from './DoctorMessage.vue';
+import DoctorChatList from './DoctorChatList.vue';
+import { getChatRequestList, getChatSessionList, getUnreadChatMessageCount } from '../../api/chat';
+import { websocketManager } from '../../utils/websocket';
 
 const router = useRouter();
 const route = useRoute();
 
-// 移动端检测 & 左侧导航折叠（默认展开）
+// 移动端检测
 const isMobile = ref(false);
-const isCollapsed = ref(false); // 默认展开
-const currentTab = ref<'home' | 'mine' | 'message'>('home');
+const currentTab = ref<'home' | 'apply' | 'health' | 'schedule'>('home');
 
 // 用于跟踪是否应该显示主页面视图（而不是路由视图）
 const showMainPageView = ref(true);
@@ -220,18 +229,10 @@ function checkMobile() {
   isMobile.value = window.innerWidth < 768;
 }
 
-function toggleCollapse() {
-  isCollapsed.value = !isCollapsed.value;
-}
 
 interface MenuItem {
   label: string;
   path: string;
-}
-
-interface MenuGroup {
-  title: string;
-  items: MenuItem[];
   icon: string;
 }
 
@@ -253,26 +254,80 @@ const {
   clearOnNewMessageCallback
 } = useNotification();
 
+// 聊天未读消息数（包括申请和聊天消息）
+const chatUnreadCount = ref(0);
+
+// 总未读消息数（通知消息 + 聊天消息）
+const totalUnreadCount = computed(() => {
+  return unreadCount.value + chatUnreadCount.value;
+});
+
+// 获取聊天未读消息数
+async function fetchChatUnreadCount() {
+  try {
+    let count = 0;
+    // 获取待处理的聊天申请数
+    const requests = await getChatRequestList(0); // status=0表示待审核
+    count += (requests || []).length;
+    
+    // 获取聊天会话的未读消息数
+    const sessions = await getChatSessionList();
+    if (sessions && sessions.length > 0) {
+      for (const session of sessions) {
+        const unread = await getUnreadChatMessageCount(session.id);
+        count += unread || 0;
+      }
+    }
+    
+    chatUnreadCount.value = count;
+  } catch (e) {
+    console.error('获取聊天未读消息数失败:', e);
+    chatUnreadCount.value = 0;
+  }
+}
+
 const showNotificationModal = ref(false);
 const notificationMessage = ref('您有新消息');
 
-// 处理新消息到达（用于显示弹窗）
+// 处理新消息到达（用于显示弹窗和更新未读数量）
 function handleNewMessage(message: any) {
-  console.log('DoctorLayout收到新消息，准备显示弹窗:', message);
-  console.log('消息类型:', typeof message);
-  console.log('消息内容:', JSON.stringify(message, null, 2));
+  console.log('DoctorLayout收到新消息:', message);
   
   try {
     if (!message) {
-      console.warn('消息为空，使用默认消息');
-      notificationMessage.value = '您有新预约消息';
+      return;
+    }
+    
+    // 检查消息类型
+    const messageTitle = message.title || '';
+    const messageType = message.type || '';
+    
+    // 如果是聊天消息，更新聊天未读数量，不弹窗
+    if (messageType === 'chat' || (messageTitle && messageTitle.includes('聊天') && messageTitle !== '聊天申请')) {
+      console.log('收到聊天消息，更新聊天未读数量');
+      // 刷新聊天未读消息数
+      fetchChatUnreadCount();
+      return;
+    }
+    
+    // 如果是聊天申请，更新聊天未读数量并弹窗
+    if (messageTitle === '聊天申请') {
+      console.log('收到聊天申请，更新未读数量并弹窗');
+      fetchChatUnreadCount();
+      notificationMessage.value = '您有新的好友申请';
       nextTick(() => {
         showNotificationModal.value = true;
       });
       return;
     }
     
-    let messageText = '您有新预约消息';
+    // 只有预约消息才弹窗
+    if (messageTitle !== '预约提醒') {
+      console.log('非预约消息，不弹窗');
+      return;
+    }
+    
+    let messageText = '您有新消息';
     
     // 检查消息标题
     if (message.title) {
@@ -285,8 +340,6 @@ function handleNewMessage(message: any) {
         const content = typeof message.content === 'string' 
           ? JSON.parse(message.content) 
           : message.content;
-        
-        console.log('解析后的消息内容:', content);
         
         if (content && typeof content === 'object') {
           if (content.userName && content.appointmentTypeName) {
@@ -304,23 +357,16 @@ function handleNewMessage(message: any) {
     }
     
     notificationMessage.value = messageText;
-    console.log('设置弹窗消息:', messageText);
     
     // 使用nextTick确保DOM已更新
     nextTick(() => {
-      console.log('显示弹窗，消息:', messageText);
       showNotificationModal.value = true;
     });
   } catch (e) {
     console.error('处理新消息失败:', e, '消息对象:', message);
-    notificationMessage.value = '您有新预约消息';
-    nextTick(() => {
-      showNotificationModal.value = true;
-    });
   }
 }
 
-const expandedGroup = ref('');
 const showProfileDialog = ref(false);
 const profileSaving = ref(false);
 const profileFormRef = ref<FormInstance>();
@@ -334,57 +380,29 @@ const profileForm = reactive({
   address: ''
 });
 
-// 医生端菜单组
-const menuGroups: MenuGroup[] = [
-  {
-    title: '宠物管理',
-    icon: '🐾',
-    items: [
-      { label: '宠物健康史', path: '/doctor/diagnosis' }
-    ]
-  },
-  {
-    title: '预约管理',
-    icon: '📅',
-    items: [
-      { label: '预约列表', path: '/doctor/apply' },
-      { label: '医生时间', path: '/doctor/free-time' },
-      { label: '排班管理', path: '/doctor/schedule' },
-      { label: '服务类型管理', path: '/doctor/service-type' }
-    ]
-  },
-  {
-    title: '宠物档案',
-    icon: '📊',
-    items: [
-      { label: '宠物日志', path: '/doctor/pet-daily' },
-      { label: '日志图表', path: '/doctor/tj-daily' }
-    ]
-  },
-  {
-    title: '医院管理',
-    icon: '🏥',
-    items: [
-      { label: '预约统计', path: '/doctor/tj-apply' },
-      { label: '发布指南', path: '/doctor/notices' },
-      { label: '标准制定', path: '/doctor/standards' }
-    ]
-  },
-  {
-    title: '药品管理',
-    icon: '💊',
-    items: [
-      { label: '药品列表', path: '/doctor/medicine' },
-      { label: '开药记录', path: '/doctor/medicine-record' }
-    ]
-  }
+// 医生端菜单项
+const menuItems: MenuItem[] = [
+  { label: '首页', path: '/doctor', icon: '🏠' },
+  { label: '预约管理', path: '/doctor/apply', icon: '📅' },
+  { label: '宠物健康史', path: '/doctor/diagnosis', icon: '❤️' },
+  { label: '排班管理', path: '/doctor/schedule', icon: '⏰' },
+  { label: '药品管理', path: '/doctor/medicine', icon: '💊' },
+  { label: '开药记录', path: '/doctor/medicine-record', icon: '📝' },
+  { label: '消息中心', path: '/doctor/message', icon: '💬' },
+  { label: '更多设置', path: '/doctor/more', icon: '⚙️' }
 ];
 
 const currentPath = computed(() => route.path);
 
-function toggleGroup(title: string) {
-  expandedGroup.value = expandedGroup.value === title ? '' : title;
-}
+// 是否显示底部导航栏
+const shouldShowBottomNav = computed(() => {
+  return isMobile.value && (
+    route.path === '/doctor' || 
+    route.path === '/doctor/apply' || 
+    route.path === '/doctor/diagnosis' || 
+    route.path === '/doctor/schedule'
+  );
+});
 
 function navigate(path: string) {
   // 移动端：标记这是功能卡片点击
@@ -416,6 +434,13 @@ function navigate(path: string) {
     }
   } else {
     // 电脑端直接导航
+    if (path === '/doctor') {
+      // 如果点击首页，显示主页视图
+      showMainPageView.value = true;
+      currentTab.value = 'home';
+    } else {
+      showMainPageView.value = false;
+    }
     router.push(path);
   }
 }
@@ -455,31 +480,99 @@ function handleChildNavigate(path: string) {
   }
 }
 
-function switchTab(tab: 'home' | 'mine' | 'message') {
+function switchTab(tab: 'home' | 'apply' | 'health' | 'schedule') {
   currentTab.value = tab;
-  // 切换tab时，显示主页面视图，不显示路由视图
+  // 切换tab时，根据tab类型决定显示主页面视图还是路由视图
   if (isMobile.value) {
     // 设置标志，表示这是tab导航
     isTabNavigation.value = true;
     isFunctionCardClick.value = false; // 重置标志
-    showMainPageView.value = true;
-    // 导航到 /doctor 路径（虽然会被重定向，但我们通过标志来控制显示主页面）
-    router.push('/doctor').catch(() => {
-      // 忽略导航重复的错误
-    });
+    
+    // 根据tab跳转到对应页面
+    if (tab === 'home') {
+      showMainPageView.value = true;
+      router.push('/doctor').catch(() => {});
+    } else {
+      // 对于其他tab，显示路由视图
+      showMainPageView.value = false;
+      if (tab === 'apply') {
+        router.push('/doctor/apply').catch(() => {});
+      } else if (tab === 'health') {
+        router.push('/doctor/diagnosis').catch(() => {});
+      } else if (tab === 'schedule') {
+        router.push('/doctor/schedule').catch(() => {});
+      }
+    }
   }
 }
 
 // 返回按钮点击事件
 function goBack() {
-  // 返回主页的home tab
-  currentTab.value = 'home';
-  isTabNavigation.value = true; // 设置标志，表示这是返回操作
-  isFunctionCardClick.value = false; // 重置标志
-  showMainPageView.value = true;
-  router.push('/doctor').catch(() => {
-    // 忽略导航重复的错误
-  });
+  const currentPath = route.path;
+  
+  // 定义路由的层级关系：子路由 -> 父路由
+  const routeHierarchy: Record<string, string> = {
+    '/doctor/prescribe-medicine': '/doctor/diagnosis',  // 开具药品 -> 宠物健康史
+    '/doctor/pet-detail': '/doctor/diagnosis',          // 宠物详情 -> 宠物健康史
+    '/doctor/apply-flow': '/doctor/apply',              // 预约流程 -> 预约管理
+  };
+  
+  // 检查是否有明确的父路由
+  if (routeHierarchy[currentPath]) {
+    const parentPath = routeHierarchy[currentPath];
+    if (parentPath === '/doctor' || parentPath === '/doctor/apply' || 
+        parentPath === '/doctor/diagnosis' || parentPath === '/doctor/schedule') {
+      if (parentPath === '/doctor') {
+        currentTab.value = 'home';
+        showMainPageView.value = true;
+      } else if (parentPath === '/doctor/apply') {
+        currentTab.value = 'apply';
+        showMainPageView.value = false;
+      } else if (parentPath === '/doctor/diagnosis') {
+        currentTab.value = 'health';
+        showMainPageView.value = false;
+      } else if (parentPath === '/doctor/schedule') {
+        currentTab.value = 'schedule';
+        showMainPageView.value = false;
+      }
+      isTabNavigation.value = true;
+      router.push(parentPath).catch(() => {});
+      return;
+    }
+  }
+  
+  // 如果当前路径是子路由，尝试推断父路由
+  if (currentPath.startsWith('/doctor/')) {
+    const pathParts = currentPath.split('/').filter(p => p);
+    if (pathParts.length >= 2) {
+      const parentPath = '/' + pathParts.slice(0, 2).join('/');
+      if (parentPath === '/doctor/apply' || parentPath === '/doctor/diagnosis' || 
+          parentPath === '/doctor/schedule') {
+        if (parentPath === '/doctor/apply') {
+          currentTab.value = 'apply';
+        } else if (parentPath === '/doctor/diagnosis') {
+          currentTab.value = 'health';
+        } else if (parentPath === '/doctor/schedule') {
+          currentTab.value = 'schedule';
+        }
+        showMainPageView.value = false;
+        isTabNavigation.value = true;
+        router.push(parentPath).catch(() => {});
+        return;
+      }
+    }
+  }
+  
+  // 默认情况：使用浏览器历史记录返回
+  if (window.history.length > 1) {
+    router.go(-1);
+  } else {
+    // 如果没有历史记录，返回到主页
+    currentTab.value = 'home';
+    isTabNavigation.value = true;
+    showMainPageView.value = true;
+    router.push('/doctor').catch(() => {});
+  }
 }
 
 // 处理下拉菜单命令
@@ -734,10 +827,7 @@ async function loadUserInfo() {
     }
   }
   
-  // 默认展开第一个菜单组
-  if (menuGroups.length > 0) {
-    expandedGroup.value = menuGroups[0].title;
-  }
+
   
   // 加载用户信息后，初始化消息提醒功能
   // 使用finalUserInfo确保有用户信息
@@ -799,9 +889,32 @@ async function loadUserInfo() {
 // 跳转到消息页面
 function goToMessage() {
   if (isMobile.value) {
-    switchTab('message');
+    // 移动端消息功能暂时保留，但不在底部导航显示
+    router.push('/doctor/message');
+    // 进入消息页面后，清除未读数量（标记为已读）
+    // 注意：这里只是清除显示，实际已读状态由消息页面处理
+    nextTick(() => {
+      fetchUnreadCount(); // 刷新未读数量
+    });
   } else {
     router.push('/doctor/message');
+  }
+}
+
+// 跳转到聊天页面
+function goToChat() {
+  router.push('/doctor/chat');
+}
+
+function goToMine() {
+  // 检查用户角色
+  const currentUserInfo = getUserInfo();
+  if (currentUserInfo && currentUserInfo.role === ROLE_ADMIN) {
+    // 管理员：跳转到管理员用户管理页面（个人中心功能在MainLayout的下拉菜单中）
+    router.push('/admin/users');
+  } else {
+    // 医生：跳转到医生个人中心
+    router.push('/doctor/mine');
   }
 }
 
@@ -823,18 +936,23 @@ onMounted(() => {
     }
   }
   
-  // 电脑端：如果路径是 /doctor，自动重定向到第一个子路由 /doctor/apply
-  // 移动端：保持 /doctor 路径，显示主页（DoctorHome组件）
-  // 使用 nextTick 确保移动端检测完成
+  // 移动端：如果路径是 /doctor，确保显示主页视图
   nextTick(() => {
-    if (!isMobile.value && route.path === '/doctor') {
-      router.replace('/doctor/apply');
-    }
-    // 移动端：如果路径是 /doctor，确保显示主页视图
     if (isMobile.value && route.path === '/doctor') {
       showMainPageView.value = true;
       currentTab.value = 'home';
     }
+  });
+  
+  // 定期刷新聊天未读消息数
+  const chatUnreadInterval = setInterval(() => {
+    if (userInfo.id) {
+      fetchChatUnreadCount();
+    }
+  }, 30000); // 每30秒刷新一次
+  
+  onUnmounted(() => {
+    clearInterval(chatUnreadInterval);
   });
 });
 
@@ -846,18 +964,22 @@ onUnmounted(() => {
   disconnectWebSocket();
 });
 
-// 监听路由变化，自动展开对应的菜单组和切换视图
+// 监听路由变化，自动切换视图
 watch(() => route.path, (newPath, oldPath) => {
-  // 电脑端：自动展开对应的菜单组
+  // 当从聊天窗口返回时，刷新未读数量
+  if (oldPath && oldPath.startsWith('/doctor/chat/') && !newPath.startsWith('/doctor/chat/')) {
+    fetchChatUnreadCount();
+  }
+  
+  // 电脑端：如果路径是 /doctor，确保显示主页视图
   if (!isMobile.value) {
-  for (const group of menuGroups) {
-    for (const item of group.items) {
-      if (item.path === newPath) {
-        expandedGroup.value = group.title;
-        return;
-        }
-      }
+    if (newPath === '/doctor') {
+      showMainPageView.value = true;
+      currentTab.value = 'home';
+    } else {
+      showMainPageView.value = false;
     }
+    return;
   }
   
   // 移动端：根据路由路径和导航类型自动切换视图
@@ -865,6 +987,7 @@ watch(() => route.path, (newPath, oldPath) => {
     // 如果路径正好是 /doctor，显示主页面视图
     if (newPath === '/doctor') {
       showMainPageView.value = true;
+      currentTab.value = 'home'; // 确保设置为home tab
       // 只有在确实是tab导航时才重置标志，否则保留功能卡片点击标志
       if (isTabNavigation.value) {
         isTabNavigation.value = false;
@@ -875,6 +998,18 @@ watch(() => route.path, (newPath, oldPath) => {
     
     // 如果路径是子路由
     if (newPath.startsWith('/doctor/') && newPath !== '/doctor') {
+      // 根据路径同步currentTab（用于底部导航栏高亮）
+      if (newPath === '/doctor/apply') {
+        currentTab.value = 'apply';
+        showMainPageView.value = false;
+      } else if (newPath === '/doctor/diagnosis') {
+        currentTab.value = 'health';
+        showMainPageView.value = false;
+      } else if (newPath === '/doctor/schedule') {
+        currentTab.value = 'schedule';
+        showMainPageView.value = false;
+      }
+      
       // 优先检查是否是功能卡片点击（功能卡片点击优先级更高）
       if (isFunctionCardClick.value) {
         showMainPageView.value = false;
@@ -883,13 +1018,13 @@ watch(() => route.path, (newPath, oldPath) => {
         return;
       }
       
-      // 如果是通过tab导航（点击底部导航或返回按钮），显示主页面视图
+      // 如果是通过tab导航（点击底部导航），显示路由视图（因为switchTab已经设置了showMainPageView）
       if (isTabNavigation.value) {
-        showMainPageView.value = true;
+        // switchTab函数已经根据tab类型设置了showMainPageView的值
+        // 这里只需要重置标志即可
         isTabNavigation.value = false; // 重置标志
-        isFunctionCardClick.value = false; // 重置标志
         return;
-      } 
+      }
       
       // 其他情况：显示路由视图（用户直接访问子路由或从其他页面跳转）
       showMainPageView.value = false;
@@ -908,7 +1043,10 @@ watch(() => route.path, (newPath, oldPath) => {
 
 .top-bar {
   height: 51px;
-  background-color: #2b2b2b;
+  background-color: rgba(255, 255, 255, 1);
+  border-style: solid;
+  border-width: 1px;
+  border-color: rgba(224, 224, 224, 1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -922,61 +1060,31 @@ watch(() => route.path, (newPath, oldPath) => {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.menu-toggle-desktop {
+  background-image: none;
   background: none;
-  border: none;
-  padding: 8px;
-  margin-right: 8px;
-  cursor: pointer;
-  color: #72C1BB;
-  border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s;
-  width: 32px;
-  height: 32px;
 }
 
-.menu-toggle-desktop:hover {
-  background-color: rgba(114, 193, 187, 0.15);
-}
-
-.toggle-icon {
-  width: 20px;
-  height: 16px;
+.title-wrapper {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  position: relative;
+  gap: 2px;
 }
 
-.toggle-icon .line {
-  display: block;
-  height: 2px;
-  width: 100%;
-  background-color: #72C1BB;
-  border-radius: 1px;
-  transition: all 0.3s ease;
+.logo .title {
+  color: #72C1BB;
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
-.toggle-icon.collapsed .line:nth-child(1) {
-  transform: rotate(45deg) translate(7px, 7px);
+.logo .subtitle {
+  color: #72C1BB;
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1;
 }
 
-.toggle-icon.collapsed .line:nth-child(2) {
-  opacity: 0;
-}
-
-.toggle-icon.collapsed .line:nth-child(3) {
-  transform: rotate(-45deg) translate(7px, -7px);
-}
-
-.menu-toggle-desktop:hover .toggle-icon .line {
-  background-color: #a5f3eb;
-}
 
 /* 移动端返回按钮 */
 .back-button {
@@ -1028,32 +1136,54 @@ watch(() => route.path, (newPath, oldPath) => {
   gap: 5px;
 }
 
-.user-info .username {
-  color: #72C1BB;
-  margin: 0 5px;
-}
-
-.message-button {
+.notification-button,
+.help-button,
+.user-avatar-button {
   position: relative;
   cursor: pointer;
-  margin: 0 10px;
-  padding: 5px;
+  margin: 0 8px;
+  padding: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.2s;
+  border-radius: 4px;
 }
 
-.message-button:hover {
-  transform: scale(1.1);
+.notification-button:hover,
+.help-button:hover,
+.user-avatar-button:hover {
+  background-color: rgba(114, 193, 187, 0.1);
 }
 
-.message-icon {
+.notification-icon,
+.help-icon,
+.user-avatar-icon {
   font-size: 20px;
+  color: #72C1BB;
+}
+
+.notification-button .notification-badge,
+.help-button .chat-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
 }
 
 .dropdown-trigger {
-  color: #72C1BB;
+  color: rgba(0, 0, 0, 1);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1066,7 +1196,7 @@ watch(() => route.path, (newPath, oldPath) => {
   color: #5aa9a3;
 }
 
-/* 移动端用户信息样式（只显示用户名，无下拉菜单） */
+/* 移动端用户信息样式 */
 .user-info-mobile {
   color: white;
   font-size: 14px;
@@ -1074,9 +1204,71 @@ watch(() => route.path, (newPath, oldPath) => {
   align-items: center;
 }
 
-.user-info-mobile .username {
+.notification-button-mobile,
+.chat-button-mobile,
+.user-avatar-button-mobile {
+  position: relative;
+  cursor: pointer;
+  margin-left: 12px;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-icon {
+  font-size: 22px;
   color: #72C1BB;
-  margin: 0;
+}
+
+.chat-icon {
+  font-size: 20px;
+  color: #72C1BB;
+}
+
+.user-avatar-icon {
+  font-size: 20px;
+  color: #72C1BB;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.chat-button-mobile .chat-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
 }
 
 .main-area {
@@ -1087,34 +1279,42 @@ watch(() => route.path, (newPath, oldPath) => {
 }
 
 .left-menu {
-  width: 180px;
-  background-color: #72C1BB;
+  width: 200px;
+  background-color: rgba(255, 255, 255, 1);
   overflow-y: auto;
   flex-shrink: 0;
-  transition: width 0.2s ease;
+  border-right: 1px solid rgba(224, 224, 224, 1);
+  padding: 8px 0;
 }
 
-.left-menu.collapsed {
-  width: 60px;
-}
-
-.left-menu.collapsed .menu-title {
-  padding: 12px 8px;
-  justify-content: center;
+.menu-item {
+  padding: 14px 20px;
+  display: flex;
   align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #333;
+  border-left: 3px solid transparent;
 }
 
-.left-menu.collapsed .arrow {
-  display: none;
+.menu-item:hover {
+  background-color: rgba(114, 193, 187, 0.1);
+  color: #72C1BB;
 }
 
-.left-menu.collapsed .menu-list {
-  display: none;
+.menu-item.active {
+  background-color: rgba(114, 193, 187, 0.15);
+  color: #72C1BB;
+  border-left-color: #72C1BB;
+  font-weight: 500;
 }
 
 .menu-icon {
   font-size: 20px;
   display: inline-block;
+  width: 24px;
+  text-align: center;
 }
 
 .menu-text {
@@ -1122,66 +1322,9 @@ watch(() => route.path, (newPath, oldPath) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.left-menu.collapsed .menu-text {
-  display: none;
-}
-
-.left-menu.collapsed .menu-icon {
-  font-size: 24px;
-}
-
-.menu-group {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.menu-title {
-  padding: 12px 15px;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: background-color 0.2s;
-}
-
-.menu-title:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.menu-title.active {
-  background-color: rgba(0, 0, 0, 0.15);
-}
-
-.arrow {
-  font-size: 10px;
-}
-
-.menu-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.menu-list li {
-  padding: 10px 15px 10px 25px;
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.2s;
   font-size: 14px;
 }
 
-.menu-list li:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.menu-list li.selected {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-left: 3px solid white;
-}
 
 .content-area {
   flex: 1;
@@ -1230,6 +1373,17 @@ watch(() => route.path, (newPath, oldPath) => {
   font-size: 24px;
   margin-bottom: 4px;
   position: relative;
+}
+
+.nav-icon .notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  border: 1px solid white;
 }
 
 .nav-label {

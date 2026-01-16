@@ -1,10 +1,10 @@
 package com.phms.websocket;
 
 import com.alibaba.fastjson.JSON;
-import com.phms.pojo.NotificationMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.lang.NonNull;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -24,7 +24,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     private static final ConcurrentHashMap<Long, WebSocketSession> userSessions = new ConcurrentHashMap<>();
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    public void afterConnectionEstablished(@NonNull WebSocketSession session) throws Exception {
         // 从session中获取用户ID（需要在连接时通过参数传递）
         Long userId = getUserIdFromSession(session);
         if (userId != null) {
@@ -37,7 +37,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) throws Exception {
         Long userId = getUserIdFromSession(session);
         if (userId != null) {
             userSessions.remove(userId);
@@ -46,13 +46,13 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+    protected void handleTextMessage(@NonNull WebSocketSession session, @NonNull TextMessage message) throws Exception {
         // 处理客户端发送的消息（如果需要双向通信）
         logger.debug("收到WebSocket消息: {}", message.getPayload());
     }
 
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+    public void handleTransportError(@NonNull WebSocketSession session, @NonNull Throwable exception) throws Exception {
         logger.error("WebSocket传输错误", exception);
         Long userId = getUserIdFromSession(session);
         if (userId != null) {
@@ -66,6 +66,9 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
      */
     private Long getUserIdFromSession(WebSocketSession session) {
         try {
+            if (session.getUri() == null) {
+                return null;
+            }
             String query = session.getUri().getQuery();
             if (query != null && query.contains("userId=")) {
                 String userIdStr = query.substring(query.indexOf("userId=") + 7);
@@ -96,8 +99,10 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
         WebSocketSession session = userSessions.get(userId);
         if (session != null && session.isOpen()) {
             try {
-                session.sendMessage(new TextMessage(message));
-                logger.info("WebSocket消息推送成功 - 用户ID: {}", userId);
+                if (message != null) {
+                    session.sendMessage(new TextMessage(message));
+                    logger.info("WebSocket消息推送成功 - 用户ID: {}", userId);
+                }
             } catch (IOException e) {
                 logger.error("WebSocket消息推送失败 - 用户ID: " + userId, e);
                 // 连接异常，移除session
@@ -116,5 +121,23 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     public boolean isUserOnline(Long userId) {
         WebSocketSession session = userSessions.get(userId);
         return session != null && session.isOpen();
+    }
+
+    /**
+     * 发送聊天消息给指定用户
+     * @param userId 用户ID
+     * @param chatMessage 聊天消息对象
+     */
+    public void sendChatMessage(Long userId, Object chatMessage) {
+        try {
+            // 包装成统一的消息格式
+            String wrappedMessage = JSON.toJSONString(new java.util.HashMap<String, Object>() {{
+                put("type", "chat");
+                put("data", chatMessage);
+            }});
+            sendMessageToUser(userId, wrappedMessage);
+        } catch (Exception e) {
+            logger.error("发送聊天消息失败 - 用户ID: {}", userId, e);
+        }
     }
 }

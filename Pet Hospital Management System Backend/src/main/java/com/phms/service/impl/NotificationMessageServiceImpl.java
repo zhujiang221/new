@@ -1,11 +1,16 @@
 package com.phms.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.phms.mapper.NotificationMessageMapper;
+import com.phms.mapper.UserMapper;
 import com.phms.model.MMGridPageVoBean;
 import com.phms.pojo.NotificationMessage;
+import com.phms.pojo.User;
 import com.phms.service.NotificationMessageService;
+import com.phms.websocket.NotificationWebSocketHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -20,6 +25,12 @@ public class NotificationMessageServiceImpl implements NotificationMessageServic
     
     @Resource
     private NotificationMessageMapper notificationMessageMapper;
+    
+    @Autowired
+    private UserMapper userMapper;
+    
+    @Autowired
+    private NotificationWebSocketHandler notificationWebSocketHandler;
 
     @Override
     public void createMessage(NotificationMessage message) {
@@ -148,6 +159,84 @@ public class NotificationMessageServiceImpl implements NotificationMessageServic
             result.put("unreadCount", 0);
             result.put("message", "检查消息失败");
             return result;
+        }
+    }
+
+    @Override
+    public int sendBroadcastNotification(List<Integer> roleIds, String title, String content, Long senderId) {
+        int successCount = 0;
+        try {
+            if (roleIds == null || roleIds.isEmpty()) {
+                logger.warn("角色ID列表为空，无法发送全局通知");
+                return 0;
+            }
+            
+            // 构建通知内容
+            Map<String, Object> contentMap = new HashMap<>();
+            contentMap.put("message", content);
+            contentMap.put("type", "BROADCAST");
+            String contentJson = JSON.toJSONString(contentMap);
+            
+            // 遍历每个角色，发送通知
+            for (Integer roleId : roleIds) {
+                try {
+                    // 排除管理员角色（不发送给管理员）
+                    if (roleId == 1) {
+                        logger.info("跳过管理员角色，不发送全局通知给管理员");
+                        continue;
+                    }
+                    
+                    // 查询该角色的所有用户（使用分页查询，limit设为很大的值以获取所有用户）
+                    List<User> users = userMapper.getAllUserByRoleId(roleId, 0, 10000);
+                    
+                    if (users == null || users.isEmpty()) {
+                        logger.info("角色 {} 没有用户，跳过发送", roleId);
+                        continue;
+                    }
+                    
+                    logger.info("开始向角色 {} 的 {} 个用户发送全局通知", roleId, users.size());
+                    
+                    // 为每个用户创建通知
+                    for (User user : users) {
+                        try {
+                            NotificationMessage notification = new NotificationMessage();
+                            notification.setReceiverId(user.getId());
+                            notification.setSenderId(senderId != null ? senderId : 0L); // 系统或管理员发送
+                            notification.setType("BROADCAST");
+                            notification.setTitle(title);
+                            notification.setContent(contentJson);
+                            notification.setIsRead(0); // 未读
+                            notification.setCreateTime(new java.util.Date());
+                            
+                            // 保存通知消息
+                            createMessage(notification);
+                            successCount++;
+                            
+                            // 通过WebSocket推送通知（如果用户在线）
+                            Map<String, Object> wsMessage = new HashMap<>();
+                            wsMessage.put("type", "notification");
+                            wsMessage.put("data", notification);
+                            String wsMessageJson = JSON.toJSONString(wsMessage);
+                            notificationWebSocketHandler.sendMessageToUser(user.getId(), wsMessageJson);
+                            
+                        } catch (Exception e) {
+                            logger.error("向用户 {} 发送全局通知失败", user.getId(), e);
+                        }
+                    }
+                    
+                    logger.info("角色 {} 的全局通知发送完成，成功: {}", roleId, successCount);
+                    
+                } catch (Exception e) {
+                    logger.error("向角色 {} 发送全局通知失败", roleId, e);
+                }
+            }
+            
+            logger.info("全局通知发送完成，总计成功: {}", successCount);
+            return successCount;
+            
+        } catch (Exception e) {
+            logger.error("发送全局通知异常", e);
+            return successCount;
         }
     }
 }

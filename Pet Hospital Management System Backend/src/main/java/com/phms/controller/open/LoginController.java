@@ -134,6 +134,10 @@ public class LoginController {
 			String code = captchaResult.getCode();
 			BufferedImage image = captchaResult.getImage();
 			
+			if (code == null) {
+				return new ResultMap().fail().message("生成验证码失败");
+			}
+			
 			// 生成验证码唯一标识
 			String captchaId = UUID.randomUUID().toString().replace("-", "");
 			

@@ -25,7 +25,12 @@ import UserProfile from '../views/user/UserProfile.vue';
 import ChangePassword from '../views/user/ChangePassword.vue';
 import UserMore from '../views/user/UserMore.vue';
 import UserMessage from '../views/user/UserMessage.vue';
+import UserMine from '../views/user/UserMine.vue';
 import UserFreeTime from '../views/user/FreeTime.vue';
+import UserChatRequest from '../views/user/UserChatRequest.vue';
+import UserChatList from '../views/user/UserChatList.vue';
+import UserChatWindow from '../views/user/UserChatWindow.vue';
+import UserChat from '../views/user/UserChat.vue';
 
 // Doctor components
 import ApplyListDoctor from '../views/doctor/ApplyListDoctor.vue';
@@ -42,7 +47,11 @@ import PrescribeMedicine from '../views/doctor/PrescribeMedicine.vue';
 import ScheduleManage from '../views/doctor/ScheduleManage.vue';
 import ServiceTypeManage from '../views/doctor/ServiceTypeManage.vue';
 import DoctorMore from '../views/doctor/DoctorMore.vue';
+import DoctorMine from '../views/doctor/DoctorMine.vue';
 import DoctorMessage from '../views/doctor/DoctorMessage.vue';
+import DoctorChatRequest from '../views/doctor/DoctorChatRequest.vue';
+import DoctorChatList from '../views/doctor/DoctorChatList.vue';
+import DoctorChatWindow from '../views/doctor/DoctorChatWindow.vue';
 
 // Admin components
 import UserList from '../views/admin/UserList.vue';
@@ -61,6 +70,8 @@ import AdminTjApply from '../views/admin/TjApply.vue';
 import AdminTjDaily from '../views/admin/TjDaily.vue';
 import AdminMedicineList from '../views/admin/MedicineList.vue';
 import AdminMedicineRecordList from '../views/admin/MedicineRecordList.vue';
+import AdminChatManage from '../views/admin/AdminChatManage.vue';
+import BroadcastNotification from '../views/admin/BroadcastNotification.vue';
 
 // Error pages
 import NotFound from '../views/NotFound.vue';
@@ -170,6 +181,42 @@ const routes: RouteRecordRaw[] = [
         name: 'user-more',
         component: UserMore,
         meta: { title: '更多功能', role: 'user' }
+      },
+      {
+        path: 'message',
+        name: 'user-message',
+        component: UserMessage,
+        meta: { title: '消息中心', role: 'user' }
+      },
+      {
+        path: 'mine',
+        name: 'user-mine',
+        component: UserMine,
+        meta: { title: '个人中心', role: 'user' }
+      },
+      {
+        path: 'chat',
+        name: 'user-chat',
+        component: UserChat,
+        meta: { title: '聊天', role: 'user' }
+      },
+      {
+        path: 'chat/list',
+        name: 'user-chat-list',
+        component: UserChatList,
+        meta: { title: '我的聊天', role: 'user' }
+      },
+      {
+        path: 'chat/request',
+        name: 'user-chat-request',
+        component: UserChatRequest,
+        meta: { title: '发起聊天申请', role: 'user' }
+      },
+      {
+        path: 'chat/:id',
+        name: 'user-chat-window',
+        component: UserChatWindow,
+        meta: { title: '聊天', role: 'user' }
       }
     ]
   },
@@ -252,6 +299,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '排班管理', role: 'doctor|admin' }
       },
       {
+        path: 'mine',
+        name: 'doctor-mine',
+        component: DoctorMine,
+        meta: { title: '个人中心', role: 'doctor' }
+      },
+      {
         path: 'more',
         name: 'doctor-more',
         component: DoctorMore,
@@ -268,6 +321,24 @@ const routes: RouteRecordRaw[] = [
         name: 'doctor-message',
         component: DoctorMessage,
         meta: { title: '消息中心', role: 'doctor' }
+      },
+      {
+        path: 'chat',
+        name: 'doctor-chat-list',
+        component: DoctorChatList,
+        meta: { title: '我的聊天', role: 'doctor' }
+      },
+      {
+        path: 'chat/request',
+        name: 'doctor-chat-request',
+        component: DoctorChatRequest,
+        meta: { title: '聊天申请管理', role: 'doctor' }
+      },
+      {
+        path: 'chat/:id',
+        name: 'doctor-chat-window',
+        component: DoctorChatWindow,
+        meta: { title: '聊天', role: 'doctor' }
       }
     ]
   },
@@ -384,6 +455,18 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-medicine-record',
         component: AdminMedicineRecordList,
         meta: { title: '开药记录管理', role: 'admin' }
+      },
+      {
+        path: '/admin/chat',
+        name: 'admin-chat-manage',
+        component: AdminChatManage,
+        meta: { title: '聊天管理', role: 'admin' }
+      },
+      {
+        path: '/admin/broadcast',
+        name: 'admin-broadcast-notification',
+        component: BroadcastNotification,
+        meta: { title: '发送全局通知', role: 'admin' }
       }
     ]
   },

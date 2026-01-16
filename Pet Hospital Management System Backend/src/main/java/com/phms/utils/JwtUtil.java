@@ -62,7 +62,7 @@ public class JwtUtil {
                 .compact();
         
         // 存储Token到Redis，实现单设备登录
-        if (stringRedisTemplate != null) {
+        if (stringRedisTemplate != null && username != null && token != null) {
             String tokenKey = TOKEN_KEY_PREFIX + username;
             
             // 如果Redis中已有该用户的Token，先删除旧Token（使旧设备登录失效）

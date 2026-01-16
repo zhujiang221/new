@@ -123,4 +123,16 @@ public interface AppointmentMapper {
                                @Param("weekDay") Integer weekDay,
                                @Param("appDate") String appDate,
                                @Param("timeSlot") String timeSlot);
+
+    /**
+     * 查询即将在指定时间范围内开始的预约（用于提醒）
+     * 查询状态为1（待就诊）或2（已确认）的预约
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @param status 预约状态（此参数已废弃，SQL中已硬编码查询状态1和2）
+     * @return 预约列表
+     */
+    List<Appointment> selectUpcomingAppointments(@Param("startTime") java.util.Date startTime,
+                                                  @Param("endTime") java.util.Date endTime,
+                                                  @Param("status") Integer status);
 }
