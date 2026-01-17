@@ -72,6 +72,7 @@ import AdminMedicineList from '../views/admin/MedicineList.vue';
 import AdminMedicineRecordList from '../views/admin/MedicineRecordList.vue';
 import AdminChatManage from '../views/admin/AdminChatManage.vue';
 import BroadcastNotification from '../views/admin/BroadcastNotification.vue';
+import ApiLogList from '../views/admin/ApiLogList.vue';
 
 // Error pages
 import NotFound from '../views/NotFound.vue';
@@ -331,8 +332,10 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'chat/request',
         name: 'doctor-chat-request',
-        component: DoctorChatRequest,
-        meta: { title: '聊天申请管理', role: 'doctor' }
+        redirect: () => {
+          return { name: 'doctor-chat-list', query: { tab: 'requests' } };
+        },
+        meta: { title: '聊天申请', role: 'doctor' }
       },
       {
         path: 'chat/:id',
@@ -467,6 +470,12 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-broadcast-notification',
         component: BroadcastNotification,
         meta: { title: '发送全局通知', role: 'admin' }
+      },
+      {
+        path: '/admin/api-log',
+        name: 'admin-api-log-list',
+        component: ApiLogList,
+        meta: { title: 'API日志管理', role: 'admin' }
       }
     ]
   },

@@ -1,14 +1,19 @@
 server:
   port: 8186
+  servlet:
+    encoding:
+      enabled: true
+      force: true
+      charset: UTF-8
 
 debug: true
 
 # 日志配置
 logging:
   level:
-    com.phms.mapper: debug
-    org.springframework.web: DEBUG
-    org.springframework.boot.autoconfigure: ERROR
+    "[com.phms.mapper]": debug
+    "[org.springframework.web]": DEBUG
+    "[org.springframework.boot.autoconfigure]": ERROR
 
 # 数据库配置
 spring:
@@ -19,6 +24,7 @@ spring:
     password: 123456
     driver-class-name: com.mysql.jdbc.Driver
     type: com.alibaba.druid.pool.DruidDataSource
+    # Druid连接池配置（自定义配置，linter可能不识别但有效）
     druid:
       initial-size: 10
       min-idle: 10
@@ -41,15 +47,11 @@ spring:
   # 静态资源配置
   mvc:
     static-path-pattern: /**
-  resources:
-    static-locations: classpath:/static/
+  web:
+    resources:
+      static-locations: classpath:/static/
 
-  # HTTP编码配置
-  http:
-    encoding:
-      enabled: true
-      force: true
-      charset: UTF-8
+  # HTTP编码配置（已迁移到server.servlet.encoding）
 
   # 文件上传配置
   servlet:
@@ -96,27 +98,20 @@ mybatis:
 
 # PageHelper配置
 pagehelper:
-  helperDialect: mysql
+  helper-dialect: mysql
   reasonable: true
-  supportMethodsArguments: true
+  support-methods-arguments: true
   params: count=countSql
-  pageSize: 10
+  page-size: 10
 
 # 自动配置排除
 spring.autoconfigure.exclude: com.github.pagehelper.autoconfigure.PageHelperAutoConfiguration
 
-# JWT配置
+# JWT配置（自定义配置，需要通过@ConfigurationProperties绑定）
 jwt:
   secret: phms-jwt-secret-key-2024-pet-hospital-management-system-secure-random-string-minimum-256-bits
   expiration: 7200000 # 2小时（毫秒）
 
-# Log4j配置
-log4j:
-  logger:
-    com.ibatis: DEBUG
-    com.ibatis.common.jdbc.SimpleDataSource: DEBUG
-    com.ibatis.common.jdbc.ScriptRunner: DEBUG
-    com.ibatis.sqlmap.engine.impl.SqlMapClientDelegate: DEBUG
-    Java.sql.Connection: DEBUG
-    java.sql.Statement: DEBUG
-    java.sql.PreparedStatement: DEBUG
+# Log4j配置（已迁移到logging.level）
+# 注意：Log4j配置应使用logging.level，而不是log4j.logger
+# 如果需要更详细的日志，可以在logging.level中配置

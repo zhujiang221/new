@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.phms.mapper.ApiLogMapper">
+    <resultMap id="BaseResultMap" type="com.phms.pojo.ApiLog">
+        <id column="id" jdbcType="BIGINT" property="id" />
+        <result column="request_url" jdbcType="VARCHAR" property="requestUrl" />
+        <result column="request_method" jdbcType="VARCHAR" property="requestMethod" />
+        <result column="request_params" jdbcType="VARCHAR" property="requestParams" />
+        <result column="request_body" jdbcType="VARCHAR" property="requestBody" />
+        <result column="response_status" jdbcType="INTEGER" property="responseStatus" />
+        <result column="response_body" jdbcType="VARCHAR" property="responseBody" />
+        <result column="error_message" jdbcType="VARCHAR" property="errorMessage" />
+        <result column="ip_address" jdbcType="VARCHAR" property="ipAddress" />
+        <result column="user_agent" jdbcType="VARCHAR" property="userAgent" />
+        <result column="execute_time" jdbcType="BIGINT" property="executeTime" />
+        <result column="status" jdbcType="INTEGER" property="status" />
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+        <result column="user_id" jdbcType="BIGINT" property="userId" />
+        <result column="user_name" jdbcType="VARCHAR" property="userName" />
+        <result column="user_real_name" jdbcType="VARCHAR" property="userRealName" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        al.id, al.request_url, al.request_method, al.request_params, al.request_body,
+        al.response_status, al.response_body, al.error_message, al.ip_address, al.user_agent,
+        al.execute_time, al.status, al.create_time, al.user_id
+    </sql>
+
+    <sql id="User_Column_List">
+        u.username as user_name, u.name as user_real_name
+    </sql>
+
+    <!-- 插入API日志 -->
+    <insert id="insert" parameterType="com.phms.pojo.ApiLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO api_log (
+            request_url, request_method, request_params, request_body,
+            response_status, response_body, error_message, ip_address, user_agent,
+            execute_time, status, create_time, user_id
+        ) VALUES (
+            #{requestUrl}, #{requestMethod}, #{requestParams}, #{requestBody},
+            #{responseStatus}, #{responseBody}, #{errorMessage}, #{ipAddress}, #{userAgent},
+            #{executeTime}, #{status}, #{createTime}, #{userId}
+        )
+    </insert>
+
+    <!-- 根据ID查询 -->
+    <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />,
+        <include refid="User_Column_List" />
+        FROM api_log al
+        LEFT JOIN user u ON al.user_id = u.id
+        WHERE al.id = #{id}
+    </select>
+
+    <!-- 分页查询API日志（带多条件搜索） -->
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />,
+        <include refid="User_Column_List" />
+        FROM api_log al
+        LEFT JOIN user u ON al.user_id = u.id
+        <where>
+            <if test="userId != null">
+                AND al.user_id = #{userId}
+            </if>
+            <if test="requestUrl != null and requestUrl != ''">
+                AND al.request_url LIKE CONCAT('%', #{requestUrl}, '%')
+            </if>
+            <if test="requestMethod != null and requestMethod != ''">
+                AND al.request_method = #{requestMethod}
+            </if>
+            <if test="ipAddress != null and ipAddress != ''">
+                AND al.ip_address LIKE CONCAT('%', #{ipAddress}, '%')
+            </if>
+            <if test="status != null">
+                AND al.status = #{status}
+            </if>
+            <if test="startTime != null">
+                AND al.create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND al.create_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY al.create_time DESC
+        <if test="begin != null and count != null">
+            LIMIT #{begin}, #{count}
+        </if>
+    </select>
+
+    <!-- 统计符合条件的日志数量 -->
+    <select id="countByCondition" resultType="int">
+        SELECT COUNT(1)
+        FROM api_log al
+        <where>
+            <if test="userId != null">
+                AND al.user_id = #{userId}
+            </if>
+            <if test="requestUrl != null and requestUrl != ''">
+                AND al.request_url LIKE CONCAT('%', #{requestUrl}, '%')
+            </if>
+            <if test="requestMethod != null and requestMethod != ''">
+                AND al.request_method = #{requestMethod}
+            </if>
+            <if test="ipAddress != null and ipAddress != ''">
+                AND al.ip_address LIKE CONCAT('%', #{ipAddress}, '%')
+            </if>
+            <if test="status != null">
+                AND al.status = #{status}
+            </if>
+            <if test="startTime != null">
+                AND al.create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND al.create_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <!-- 删除指定日期之前的日志 -->
+    <delete id="deleteByDateBefore">
+        DELETE FROM api_log
+        WHERE create_time &lt; #{date}
+    </delete>
+</mapper>

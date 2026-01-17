@@ -374,6 +374,14 @@ const menuGroups: MenuGroup[] = [
       { label: '药品列表', path: '/admin/medicine' },
       { label: '开药记录', path: '/admin/medicine-record' }
     ]
+  },
+  {
+    title: '日志管理',
+    icon: '📋',
+    role: String(ROLE_ADMIN),
+    items: [
+      { label: 'API日志', path: '/admin/api-log' }
+    ]
   }
 ];
 
@@ -1095,7 +1103,7 @@ watch(() => route.path, (newPath) => {
 
 .footer {
   height: 40px;
-  background-color: #2b2b2b;
+  background-color: rgba(255, 255, 255, 1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1103,7 +1111,7 @@ watch(() => route.path, (newPath) => {
 }
 
 .footer p {
-  color: #72C1BB;
+  color: rgba(0, 0, 0, 1);
   font-size: 12px;
   margin: 0;
 }

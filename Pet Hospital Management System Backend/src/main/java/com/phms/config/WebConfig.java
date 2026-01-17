@@ -3,6 +3,7 @@ package com.phms.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.phms.common.MyDateFormat;
 import com.phms.filter.TimeFilter;
+import com.phms.interceptor.ApiLogInterceptor;
 import com.phms.listener.ListenerTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.lang.NonNull;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -61,6 +63,9 @@ public class WebConfig implements WebMvcConfigurer{
 	}
 
 	@Autowired
+	private ApiLogInterceptor apiLogInterceptor;
+
+	@Autowired
 	private Jackson2ObjectMapperBuilder jackson2ObjectMapperBuilder;
 
 	@Bean
@@ -88,5 +93,31 @@ public class WebConfig implements WebMvcConfigurer{
 	@Override
 	public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
 		registry.addResourceHandler("/file/**").addResourceLocations("file:D:/upload/");
+	}
+
+	/**
+	 * 注册拦截器
+	 */
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		registry.addInterceptor(apiLogInterceptor)
+				.addPathPatterns("/**")
+				.excludePathPatterns(
+						"/login",
+						"/logout",
+						"/regist",
+						"/doRegist",
+						"/sendEmailCode",
+						"/sendResetPasswordCode",
+						"/resetPassword",
+						"/captcha",
+						"/open/**",
+						"/error/**",
+						"/imgs/**",
+						"/file/**",
+						"/css/**",
+						"/js/**",
+						"/favicon.ico"
+				);
 	}
 }

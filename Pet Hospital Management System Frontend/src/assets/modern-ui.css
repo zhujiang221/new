@@ -177,6 +177,11 @@
   color: var(--text-tertiary);
 }
 
+/* select元素使用modern-input类时，宽度自适应内容 */
+select.modern-input {
+  width: fit-content;
+}
+
 /* 现代化搜索栏 */
 .modern-search-bar {
   display: flex;

@@ -61,8 +61,8 @@ export default defineConfig({
       // Admin APIs（排除前端路由页面）
       // 排除的前端路由：users, pets, diagnosis, apply, free-time, schedule, service-type, 
       // notices, assess, standards, pet-daily, tj-apply, tj-daily, medicine, medicine-record, 
-      // chat, broadcast, appointment-type
-      '^/admin/(?!roles$|pages$|users$|user-role$|pets$|diagnosis$|apply$|free-time$|schedule$|service-type$|notices$|assess$|standards$|pet-daily$|tj-apply$|tj-daily$|medicine$|medicine-record$|chat$|broadcast$|appointment-type$).*': {
+      // chat, broadcast, appointment-type, api-log
+      '^/admin/(?!roles$|pages$|users$|user-role$|pets$|diagnosis$|apply$|free-time$|schedule$|service-type$|notices$|assess$|standards$|pet-daily$|tj-apply$|tj-daily$|medicine$|medicine-record$|chat$|broadcast$|appointment-type$|api-log$).*': {
         target: PROXY_TARGET,
         changeOrigin: true
       },

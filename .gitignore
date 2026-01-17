@@ -192,3 +192,4 @@ coverage/
 
 # 编译文件
 *.class
+*.md

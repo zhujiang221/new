@@ -27,10 +27,12 @@ http.interceptors.request.use(
                         url === '/sendResetPasswordCode' || url === '/regist';
     
     if (token && !isPublicPath) {
+      // 确保 token 格式正确（去除可能的空格）
+      const cleanToken = token.trim();
       // 直接设置 Authorization 头（axios 会自动处理 headers 对象）
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers['Authorization'] = `Bearer ${cleanToken}`;
       // 调试信息：检查token是否正确添加到请求头
-      console.log(`[HTTP] 添加Token到请求头: ${config.method?.toUpperCase()} ${url}, Token: ${token.substring(0, 20)}...`);
+      console.log(`[HTTP] 添加Token到请求头: ${config.method?.toUpperCase()} ${url}, Token: ${cleanToken.substring(0, 20)}...`);
     } else if (!isPublicPath) {
       console.warn(`[HTTP] 请求需要Token但未找到: ${config.method?.toUpperCase()} ${url}`);
       // 即使没有token，也确保headers对象存在，避免后续错误
@@ -98,6 +100,40 @@ let isHandling401 = false;
 // Response interceptor
 http.interceptors.response.use(
   (response) => {
+    // 检查响应数据，如果 result 为 fail 且 message 包含"登录"，说明需要重新登录
+    if (response.data && response.data.result === 'fail') {
+      const message = response.data.message || '';
+      if (message.includes('登录') || message.includes('请先登录') || message.includes('登录已过期')) {
+        // 避免重复处理
+        if (isHandling401) {
+          return response;
+        }
+        
+        isHandling401 = true;
+        
+        const currentPath = window.location.pathname;
+        // 如果不在登录页，才处理
+        if (currentPath !== '/' && !currentPath.startsWith('/login')) {
+          // 清除Token和用户信息
+          removeToken();
+          clearUserInfo();
+          
+          // 显示友好的提示信息
+          showMessage(message || '登录已过期，请重新登录', 'error');
+          
+          // 延迟重定向，让用户看到提示信息
+          setTimeout(() => {
+            isHandling401 = false;
+            router.push('/').catch(() => {
+              // 如果路由跳转失败，使用window.location
+              window.location.href = '/';
+            });
+          }, 2000); // 2秒后跳转，让用户看到提示
+        } else {
+          isHandling401 = false;
+        }
+      }
+    }
     return response;
   },
   (error) => {
