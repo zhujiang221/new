@@ -320,8 +320,8 @@ function getStatusClass(status: number): string {
 
 function getAvatarText(name: string): string {
   if (!name) return '👨‍⚕️';
-  // 取最后一个字符作为头像
-  return name.slice(-1);
+  // 取第一个字符作为头像
+  return name.charAt(0);
 }
 
 function formatTime(timeStr?: string): string {

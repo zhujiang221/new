@@ -33,24 +33,23 @@ let chartInstance: echarts.ECharts | null = null;
 async function fetchData() {
   loading.value = true;
   try {
-    // Admin can view all appointments using doctor API
-    const resp = await http.get('/user/apply/getAllByLimitDoctor', {
+    const resp = await http.get('/user/apply/getAllByLimitAdmin', {
       params: { page: 1, limit: 10000 }
     });
     const rows = resp.data.rows || [];
     
-    // Count by status
-    let a1 = 0, a2 = 0, a3 = 0, a4 = 0;
+    let a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
     rows.forEach((item: any) => {
       switch (item.status) {
-        case 1: a1++; break; // 申请中
-        case 2: a2++; break; // 申请通过
-        case 3: a3++; break; // 不通过
-        case 4: a4++; break; // 已完成
+        case 1: a1++; break;
+        case 2: a2++; break;
+        case 3: a3++; break;
+        case 4: a4++; break;
+        case 5: a5++; break;
       }
     });
     
-    renderChart(a1, a2, a3, a4);
+    renderChart(a1, a2, a3, a4, a5);
   } catch (e) {
     console.error('获取数据失败:', e);
   } finally {
@@ -58,7 +57,7 @@ async function fetchData() {
   }
 }
 
-function renderChart(a1: number, a2: number, a3: number, a4: number) {
+function renderChart(a1: number, a2: number, a3: number, a4: number, a5: number) {
   if (!chartRef.value) return;
   
   if (!chartInstance) {
@@ -78,7 +77,7 @@ function renderChart(a1: number, a2: number, a3: number, a4: number) {
     legend: {
       orient: 'vertical',
       left: 'left',
-      data: ['申请中', '申请通过', '不通过', '已完成']
+      data: ['申请中', '申请通过', '不通过', '已完成', '已取消']
     },
     series: [
       {
@@ -90,7 +89,8 @@ function renderChart(a1: number, a2: number, a3: number, a4: number) {
           { value: a1, name: '申请中' },
           { value: a2, name: '申请通过' },
           { value: a3, name: '不通过' },
-          { value: a4, name: '已完成' }
+          { value: a4, name: '已完成' },
+          { value: a5, name: '已取消' }
         ],
         emphasis: {
           itemStyle: {

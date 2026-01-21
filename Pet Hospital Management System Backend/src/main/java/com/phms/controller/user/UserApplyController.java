@@ -448,6 +448,57 @@ public class UserApplyController {
     }
 
     /**
+     * 管理员专用接口：返回所有预约数据
+     * 管理员可以看到所有预约记录，不受医生ID限制
+     */
+    @RequestMapping("/getAllByLimitAdmin")
+    @ResponseBody
+    public Object getAllByLimitAdmin(Appointment appointment) {
+        Subject subject = SecurityUtils.getSubject();
+        Object principal = subject.getPrincipal();
+
+        User user = null;
+        if (principal instanceof User) {
+            user = (User) principal;
+        } else {
+            try {
+                ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                if (attrs != null) {
+                    String authHeader = attrs.getRequest().getHeader("Authorization");
+                    if (authHeader != null && !authHeader.isEmpty()) {
+                        String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : authHeader;
+                        String username = jwtUtil.getUsernameFromToken(token);
+                        if (username != null) {
+                            user = userMapper.getByUsername(username);
+                            logger.info("通过Token兜底获取用户信息成功，username: {}", username);
+                        } else {
+                            logger.error("通过Token解析用户名失败，authHeader前20: {}", authHeader.length() > 20 ? authHeader.substring(0, 20) + "..." : authHeader);
+                        }
+                    } else {
+                        logger.error("Authorization头为空，无法兜底获取用户信息");
+                    }
+                } else {
+                    logger.error("RequestContextHolder未获取到请求上下文，无法兜底获取用户信息");
+                }
+            } catch (Exception e) {
+                logger.error("兜底解析Token获取用户失败", e);
+            }
+        }
+
+        if (user == null) {
+            logger.error("当前会话未获取到有效用户对象，principal: {}", principal);
+            return "LGINOUT";
+        }
+
+        if (appointment == null) {
+            appointment = new Appointment();
+        }
+
+        logger.info("管理员查询所有预约数据，用户ID: {}, 搜索信息: {}", user.getId(), appointment.getInfo());
+        return appointmentService.getAllByLimit(appointment);
+    }
+
+    /**
      * 获取医生在指定日期的可用时间段列表
      */
     @RequestMapping(value = "/getAvailableSlots")

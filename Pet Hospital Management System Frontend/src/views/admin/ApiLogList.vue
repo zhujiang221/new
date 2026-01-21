@@ -357,11 +357,11 @@ const fetchList = async () => {
     } else {
       // 其他情况，尝试直接使用 data
       if (response.data.data) {
-        const data = response.data.data
-        list.value = data.rows || []
-        pagination.total = data.total || 0
-      } else {
-        ElMessage.error(response.data.message || '查询失败')
+      const data = response.data.data
+      list.value = data.rows || []
+      pagination.total = data.total || 0
+    } else {
+      ElMessage.error(response.data.message || '查询失败')
       }
     }
   } catch (error: any) {

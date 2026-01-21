@@ -25,36 +25,36 @@
 
     <!-- 聊天会话列表 -->
     <div v-if="currentTab === 'sessions'">
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="sessionList.length === 0" class="empty-state">
-        <div class="empty-icon">💬</div>
-        <div class="empty-text">暂无聊天会话</div>
-      </div>
-      <div v-else class="session-list">
-        <div
-          v-for="session in sessionList"
-          :key="session.id"
-          class="session-item"
-          :class="{ active: currentSessionId === session.id }"
-          @click="openChat(session)"
-        >
-          <div class="session-avatar">
-            <img v-if="session.userImg" :src="session.userImg" :alt="session.userName" />
-            <div v-else class="avatar-placeholder">{{ session.userName?.charAt(0) || 'U' }}</div>
+    <div v-if="loading" class="loading">加载中...</div>
+    <div v-else-if="sessionList.length === 0" class="empty-state">
+      <div class="empty-icon">💬</div>
+      <div class="empty-text">暂无聊天会话</div>
+    </div>
+    <div v-else class="session-list">
+      <div
+        v-for="session in sessionList"
+        :key="session.id"
+        class="session-item"
+        :class="{ active: currentSessionId === session.id }"
+        @click="openChat(session)"
+      >
+        <div class="session-avatar">
+          <img v-if="session.userImg" :src="session.userImg" :alt="session.userName" />
+          <div v-else class="avatar-placeholder">{{ session.userName?.charAt(0) || 'U' }}</div>
+        </div>
+        <div class="session-info">
+          <div class="session-header">
+            <div class="session-name">{{ session.userName || '未知用户' }}</div>
+            <div class="session-time">{{ formatTime(session.lastMessageTime || session.createTime) }}</div>
           </div>
-          <div class="session-info">
-            <div class="session-header">
-              <div class="session-name">{{ session.userName || '未知用户' }}</div>
-              <div class="session-time">{{ formatTime(session.lastMessageTime || session.createTime) }}</div>
-            </div>
-            <div class="session-preview">
-              <span v-if="session.lastMessageType === 'image'" class="preview-icon">📷</span>
-              <span v-else-if="session.lastMessageType === 'emoji'" class="preview-icon">😊</span>
-              <span class="preview-text">{{ getPreviewText(session) }}</span>
-            </div>
+          <div class="session-preview">
+            <span v-if="session.lastMessageType === 'image'" class="preview-icon">📷</span>
+            <span v-else-if="session.lastMessageType === 'emoji'" class="preview-icon">😊</span>
+            <span class="preview-text">{{ getPreviewText(session) }}</span>
           </div>
-          <div v-if="session.unreadCount && session.unreadCount > 0" class="unread-badge">
-            {{ session.unreadCount > 99 ? '99+' : session.unreadCount }}
+        </div>
+        <div v-if="session.unreadCount && session.unreadCount > 0" class="unread-badge">
+          {{ session.unreadCount > 99 ? '99+' : session.unreadCount }}
           </div>
         </div>
       </div>

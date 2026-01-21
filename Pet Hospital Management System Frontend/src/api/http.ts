@@ -43,21 +43,43 @@ http.interceptors.request.use(
     
     // Only set Content-Type for POST/PUT/PATCH requests with data
     if (config.data && ['post', 'put', 'patch'].includes(config.method?.toLowerCase() || '')) {
-      // 如果已经设置了 Content-Type，使用用户指定的类型
-      const contentType = config.headers['Content-Type'] || config.headers['content-type'];
+      // 获取 Content-Type，处理不同的 header 键名格式
+      let contentType = '';
+      if (config.headers) {
+        // 处理普通对象 headers
+        if (typeof config.headers === 'object') {
+          contentType = config.headers['Content-Type'] || 
+                        config.headers['content-type'] || 
+                        config.headers['CONTENT-TYPE'] || '';
+        }
+        // 处理 AxiosHeaders 对象
+        if (typeof config.headers.get === 'function') {
+          contentType = String(config.headers.get('Content-Type') || 
+                        config.headers.get('content-type') || '');
+                        config.headers.get('content-type') || '';
+        }
+      }
       
       // 如果没有设置 Content-Type，默认使用表单格式
       if (!contentType) {
-        config.headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+        // 设置默认 Content-Type
+        if (typeof config.headers === 'object' && typeof config.headers !== 'function') {
+          config.headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+        } else if (config.headers && typeof (config.headers as any).set === 'function') {
+          (config.headers as any)['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+        }
       }
       
-      // 只有在 Content-Type 是表单格式时，才转换为 URLSearchParams
-      // 如果 Content-Type 是 application/json，保持原样
-      if (contentType && contentType.includes('application/json')) {
+      // 检查是否为 JSON 格式
+      const isJsonContentType = contentType.toLowerCase().includes('application/json');
+      
+      if (isJsonContentType) {
         // JSON 格式，保持原样，axios 会自动序列化
-        // 确保数据是 JSON 字符串或对象
-        if (typeof config.data === 'object' && !(config.data instanceof FormData) && !(config.data instanceof URLSearchParams)) {
-          // axios 会自动将对象序列化为 JSON，不需要手动转换
+        // 确保数据是 JSON 字符串或对象/数组
+        if (typeof config.data === 'object' && 
+            !(config.data instanceof FormData) && 
+            !(config.data instanceof URLSearchParams)) {
+          // axios 会自动将对象/数组序列化为 JSON，不需要手动转换
         }
       } else {
         // 表单格式，转换为 URLSearchParams
@@ -70,18 +92,29 @@ http.interceptors.request.use(
           } else {
             // Convert object to URLSearchParams
             const params = new URLSearchParams();
-            for (const key in config.data) {
-              if (config.data[key] !== undefined && config.data[key] !== null) {
-                // Handle arrays by appending multiple values with the same key
-                if (Array.isArray(config.data[key])) {
-                  config.data[key].forEach((value: any) => {
-                    params.append(key, String(value));
-                  });
-                } else {
-                  params.append(key, String(config.data[key]));
+            
+            // 检查是否为数组
+            if (Array.isArray(config.data)) {
+              // 对于数组，我们需要特殊处理
+              // 这里我们简单地将数组转换为 JSON 字符串，因为 URLSearchParams 不适合处理复杂数组
+              // 或者根据后端 API 的要求进行处理
+              params.append('data', JSON.stringify(config.data));
+            } else {
+              // 对于普通对象，遍历属性
+              for (const key in config.data) {
+                if (config.data[key] !== undefined && config.data[key] !== null) {
+                  // Handle arrays by appending multiple values with the same key
+                  if (Array.isArray(config.data[key])) {
+                    config.data[key].forEach((value: any) => {
+                      params.append(key, String(value));
+                    });
+                  } else {
+                    params.append(key, String(config.data[key]));
+                  }
                 }
               }
             }
+            
             config.data = params.toString();
           }
         }

@@ -119,7 +119,8 @@ export default defineConfig({
       // /user/pets, /user/apply, /user/apply-flow, /user/standards, /user/pet-daily, 
       // /user/notices, /user/diagnosis, /user/tj-apply, /user/tj-daily, 
       // /user/assess, /user/free-time, /user/profile, /user/change-password, /user/message, /user/more, /user/mine
-      '^/user/(?!pets$|apply$|apply-flow$|standards$|pet-daily$|notices$|diagnosis$|tj-apply$|tj-daily$|assess$|free-time$|profile$|change-password$|message$|more$|mine$).+': {
+      // /user/chat, /user/chat/list, /user/chat/request, /user/chat/:id
+      '^/user/(?!pets$|apply$|apply-flow$|standards$|pet-daily$|notices$|diagnosis$|tj-apply$|tj-daily$|assess$|free-time$|profile$|change-password$|message$|more$|mine$|chat$|chat/).+': {
         target: PROXY_TARGET,
         changeOrigin: true
       },

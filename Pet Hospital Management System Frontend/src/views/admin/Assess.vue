@@ -171,7 +171,7 @@ async function fetchData() {
       names.push(pet.name);
 
       const petDailys = dailys
-        .filter((d: any) => d.petId === pet.id || d.name === pet.name)
+        .filter((d: any) => String(d.petId) === String(pet.id))
         .sort((a: any, b: any) => {
           const ta = new Date(a.createTime || a.dateTime || 0).getTime();
           const tb = new Date(b.createTime || b.dateTime || 0).getTime();

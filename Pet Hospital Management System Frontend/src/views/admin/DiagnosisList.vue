@@ -138,12 +138,13 @@ function getTypeClass(type: number) {
   }
 }
 
-function formatSex(sex: string | number) {
+function formatSex(sex: string | number | undefined) {
+  if (sex === undefined || sex === null || String(sex) === 'undefined') return '未知';
   const sexStr = String(sex);
   if (sexStr === '1') return '公';
   if (sexStr === '2') return '母';
   if (sexStr === '3') return '未知';
-  return sexStr || '未知';
+  return '未知';
 }
 
 async function fetchData() {

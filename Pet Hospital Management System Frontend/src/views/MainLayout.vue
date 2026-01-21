@@ -343,6 +343,7 @@ const menuGroups: MenuGroup[] = [
     role: String(ROLE_ADMIN),
     items: [
       { label: '预约列表', path: '/admin/apply' },
+      { label: '预约统计', path: '/admin/tj-apply' },
       { label: '预约类型管理', path: '/admin/appointment-type' }
     ]
   },
@@ -362,7 +363,6 @@ const menuGroups: MenuGroup[] = [
     role: String(ROLE_ADMIN),
     items: [
       { label: '宠物日志', path: '/admin/pet-daily' },
-      { label: '预约统计', path: '/admin/tj-apply' },
       { label: '日志统计', path: '/admin/tj-daily' }
     ]
   },
@@ -453,34 +453,33 @@ async function loadProfileData() {
 async function submitProfile() {
   if (!profileFormRef.value) return;
   
-  await profileFormRef.value.validate(async (valid) => {
+  try {
+    const valid = await profileFormRef.value.validate();
     if (valid) {
       profileSaving.value = true;
-      try {
-        const resp = await http.post('/user/updateUser', {
-          id: profileForm.id,
-          name: profileForm.name.trim(),
-          phone: profileForm.phone.trim(),
-          email: profileForm.email.trim(),
-          address: profileForm.address.trim()
-        });
-        
-        if (resp.data === 'SUCCESS' || resp.data?.status === 'SUCCESS') {
-          showMessage('保存成功', 'success');
-          // 强制从API重新获取最新的用户信息
-          await refreshUserInfo();
-          showProfileDialog.value = false;
-        } else {
-          showMessage('保存失败', 'error');
-        }
-      } catch (e) {
-        console.error('保存失败:', e);
-        showMessage('操作失败', 'error');
-      } finally {
-        profileSaving.value = false;
+      const resp = await http.post('/user/updateUser', {
+        id: profileForm.id,
+        name: profileForm.name.trim(),
+        phone: profileForm.phone.trim(),
+        email: profileForm.email.trim(),
+        address: profileForm.address.trim()
+      });
+      
+      if (resp.data === 'SUCCESS' || resp.data?.status === 'SUCCESS') {
+        showMessage('保存成功', 'success');
+        // 强制从API重新获取最新的用户信息
+        await refreshUserInfo();
+        showProfileDialog.value = false;
+      } else {
+        showMessage('保存失败', 'error');
       }
     }
-  });
+  } catch (e) {
+    console.error('保存失败:', e);
+    showMessage('操作失败', 'error');
+  } finally {
+    profileSaving.value = false;
+  }
 }
 
 // 强制从API刷新用户信息

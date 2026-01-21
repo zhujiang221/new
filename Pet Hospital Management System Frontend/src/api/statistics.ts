@@ -33,24 +33,35 @@ export interface HealthTrend {
 export async function getHomeStatistics(): Promise<HomeStatistics> {
   try {
     const resp = await http.get('/user/home/statistics');
-    const data = resp.data;
+    const responseData = resp.data;
     
-    // 处理不同的响应格式
-    if (data && typeof data === 'object') {
-      return {
-        pendingAppointments: data.pendingAppointments || data.pending_appointments || 0,
-        petLogs: data.petLogs || data.pet_logs || 0,
-        unreadMessages: data.unreadMessages || data.unread_messages || 0
-      };
+    // 处理后端返回的ResultMap格式
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.result === 'success' && responseData.data) {
+        const data = responseData.data;
+        return {
+          pendingAppointments: data.pendingAppointments || data.pending_appointments || 0,
+          petLogs: data.petLogs || data.pet_logs || 0,
+          unreadMessages: data.unreadMessages || data.unread_messages || 0
+        };
+      } else if (responseData.result === 'fail') {
+        console.error('获取统计数据失败:', responseData.message || '未知错误');
+        return {
+          pendingAppointments: 0,
+          petLogs: 0,
+          unreadMessages: 0
+        };
+      }
     }
     
+    console.warn('获取统计数据: 响应格式不符合预期', responseData);
     return {
       pendingAppointments: 0,
       petLogs: 0,
       unreadMessages: 0
     };
   } catch (e) {
-    console.error('获取统计数据失败:', e);
+    console.error('获取统计数据异常:', e);
     return {
       pendingAppointments: 0,
       petLogs: 0,
@@ -67,19 +78,29 @@ export async function getRecentAppointments(limit: number = 3): Promise<RecentAp
     const resp = await http.get('/user/home/recentAppointments', {
       params: { limit }
     });
-    const data = resp.data;
+    const responseData = resp.data;
     
-    if (data && Array.isArray(data)) {
-      return data;
+    // 处理后端返回的ResultMap格式
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.result === 'success') {
+        // 检查data字段是否存在且为数组
+        if (responseData.data && Array.isArray(responseData.data)) {
+          return responseData.data;
+        }
+        // 检查data.rows字段是否存在且为数组
+        if (responseData.data && responseData.data.rows && Array.isArray(responseData.data.rows)) {
+          return responseData.data.rows;
+        }
+      } else if (responseData.result === 'fail') {
+        console.error('获取近期预约失败:', responseData.message || '未知错误');
+        return [];
+      }
     }
     
-    if (data && data.rows && Array.isArray(data.rows)) {
-      return data.rows;
-    }
-    
+    console.warn('获取近期预约: 响应格式不符合预期', responseData);
     return [];
   } catch (e) {
-    console.error('获取近期预约失败:', e);
+    console.error('获取近期预约异常:', e);
     return [];
   }
 }
@@ -90,19 +111,34 @@ export async function getRecentAppointments(limit: number = 3): Promise<RecentAp
 export async function getHealthTrends(): Promise<HealthTrend> {
   try {
     const resp = await http.get('/user/home/healthTrends');
-    const data = resp.data;
+    const responseData = resp.data;
     
-    if (data && typeof data === 'object') {
-      return {
-        weightStatus: data.weightStatus || 'normal',
-        activityStatus: data.activityStatus || 'normal',
-        dietStatus: data.dietStatus || 'normal',
-        weightProgress: data.weightProgress || data.weight_progress || 0,
-        activityProgress: data.activityProgress || data.activity_progress || 0,
-        dietProgress: data.dietProgress || data.diet_progress || 0
-      };
+    // 处理后端返回的ResultMap格式
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.result === 'success' && responseData.data) {
+        const data = responseData.data;
+        return {
+          weightStatus: data.weightStatus || 'normal',
+          activityStatus: data.activityStatus || 'normal',
+          dietStatus: data.dietStatus || 'normal',
+          weightProgress: data.weightProgress || data.weight_progress || 0,
+          activityProgress: data.activityProgress || data.activity_progress || 0,
+          dietProgress: data.dietProgress || data.diet_progress || 0
+        };
+      } else if (responseData.result === 'fail') {
+        console.error('获取健康趋势失败:', responseData.message || '未知错误');
+        return {
+          weightStatus: 'normal',
+          activityStatus: 'normal',
+          dietStatus: 'normal',
+          weightProgress: 0,
+          activityProgress: 0,
+          dietProgress: 0
+        };
+      }
     }
     
+    console.warn('获取健康趋势: 响应格式不符合预期', responseData);
     return {
       weightStatus: 'normal',
       activityStatus: 'normal',
@@ -112,7 +148,7 @@ export async function getHealthTrends(): Promise<HealthTrend> {
       dietProgress: 0
     };
   } catch (e) {
-    console.error('获取健康趋势失败:', e);
+    console.error('获取健康趋势异常:', e);
     return {
       weightStatus: 'normal',
       activityStatus: 'normal',
@@ -157,18 +193,32 @@ export interface WorkStatistics {
 export async function getDoctorHomeStatistics(): Promise<DoctorHomeStatistics> {
   try {
     const resp = await http.get('/doctor/home/statistics');
-    const data = resp.data;
+    const responseData = resp.data;
     
-    if (data && typeof data === 'object') {
-      return {
-        pendingAppointments: data.pendingAppointments || data.pending_appointments || 0,
-        todayTotalAppointments: data.todayTotalAppointments || data.today_total_appointments || 0,
-        todayCompleted: data.todayCompleted || data.today_completed || 0,
-        inClinicPatients: data.inClinicPatients || data.in_clinic_patients || 0,
-        weekPrescriptions: data.weekPrescriptions || data.week_prescriptions || 0
-      };
+    // 处理后端返回的ResultMap格式
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.result === 'success' && responseData.data) {
+        const data = responseData.data;
+        return {
+          pendingAppointments: data.pendingAppointments || data.pending_appointments || 0,
+          todayTotalAppointments: data.todayTotalAppointments || data.today_total_appointments || 0,
+          todayCompleted: data.todayCompleted || data.today_completed || 0,
+          inClinicPatients: data.inClinicPatients || data.in_clinic_patients || 0,
+          weekPrescriptions: data.weekPrescriptions || data.week_prescriptions || 0
+        };
+      } else if (responseData.result === 'fail') {
+        console.error('获取医生统计数据失败:', responseData.message || '未知错误');
+        return {
+          pendingAppointments: 0,
+          todayTotalAppointments: 0,
+          todayCompleted: 0,
+          inClinicPatients: 0,
+          weekPrescriptions: 0
+        };
+      }
     }
     
+    console.warn('获取医生统计数据: 响应格式不符合预期', responseData);
     return {
       pendingAppointments: 0,
       todayTotalAppointments: 0,
@@ -177,7 +227,7 @@ export async function getDoctorHomeStatistics(): Promise<DoctorHomeStatistics> {
       weekPrescriptions: 0
     };
   } catch (e) {
-    console.error('获取医生统计数据失败:', e);
+    console.error('获取医生统计数据异常:', e);
     return {
       pendingAppointments: 0,
       todayTotalAppointments: 0,
@@ -196,19 +246,29 @@ export async function getTodaySchedule(limit: number = 10): Promise<TodaySchedul
     const resp = await http.get('/doctor/home/todaySchedule', {
       params: { limit }
     });
-    const data = resp.data;
+    const responseData = resp.data;
     
-    if (data && Array.isArray(data)) {
-      return data;
+    // 处理后端返回的ResultMap格式
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.result === 'success') {
+        // 检查data字段是否存在且为数组
+        if (responseData.data && Array.isArray(responseData.data)) {
+          return responseData.data;
+        }
+        // 检查data.rows字段是否存在且为数组
+        if (responseData.data && responseData.data.rows && Array.isArray(responseData.data.rows)) {
+          return responseData.data.rows;
+        }
+      } else if (responseData.result === 'fail') {
+        console.error('获取今日排班失败:', responseData.message || '未知错误');
+        return [];
+      }
     }
     
-    if (data && data.rows && Array.isArray(data.rows)) {
-      return data.rows;
-    }
-    
+    console.warn('获取今日排班: 响应格式不符合预期', responseData);
     return [];
   } catch (e) {
-    console.error('获取今日排班失败:', e);
+    console.error('获取今日排班异常:', e);
     return [];
   }
 }
@@ -219,17 +279,30 @@ export async function getTodaySchedule(limit: number = 10): Promise<TodaySchedul
 export async function getWorkStatistics(): Promise<WorkStatistics> {
   try {
     const resp = await http.get('/doctor/home/workStatistics');
-    const data = resp.data;
+    const responseData = resp.data;
     
-    if (data && typeof data === 'object') {
-      return {
-        weekConsultations: data.weekConsultations || data.week_consultations || 0,
-        weekConsultationsTarget: data.weekConsultationsTarget || data.week_consultations_target || 50,
-        patientSatisfaction: data.patientSatisfaction || data.patient_satisfaction || 0,
-        monthPrescriptions: data.monthPrescriptions || data.month_prescriptions || 0
-      };
+    // 处理后端返回的ResultMap格式
+    if (responseData && typeof responseData === 'object') {
+      if (responseData.result === 'success' && responseData.data) {
+        const data = responseData.data;
+        return {
+          weekConsultations: data.weekConsultations || data.week_consultations || 0,
+          weekConsultationsTarget: data.weekConsultationsTarget || data.week_consultations_target || 50,
+          patientSatisfaction: data.patientSatisfaction || data.patient_satisfaction || 0,
+          monthPrescriptions: data.monthPrescriptions || data.month_prescriptions || 0
+        };
+      } else if (responseData.result === 'fail') {
+        console.error('获取工作统计失败:', responseData.message || '未知错误');
+        return {
+          weekConsultations: 0,
+          weekConsultationsTarget: 50,
+          patientSatisfaction: 0,
+          monthPrescriptions: 0
+        };
+      }
     }
     
+    console.warn('获取工作统计: 响应格式不符合预期', responseData);
     return {
       weekConsultations: 0,
       weekConsultationsTarget: 50,
@@ -237,7 +310,7 @@ export async function getWorkStatistics(): Promise<WorkStatistics> {
       monthPrescriptions: 0
     };
   } catch (e) {
-    console.error('获取工作统计失败:', e);
+    console.error('获取工作统计异常:', e);
     return {
       weekConsultations: 0,
       weekConsultationsTarget: 50,

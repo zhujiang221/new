@@ -28,14 +28,15 @@
           <th>联系电话</th>
           <th>地址</th>
           <th>预约内容</th>
+          <th width="120">操作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td colspan="13" class="loading">加载中...</td>
+          <td colspan="14" class="loading">加载中...</td>
         </tr>
         <tr v-else-if="list.length === 0">
-          <td colspan="13" class="empty-state">暂无数据</td>
+          <td colspan="14" class="empty-state">暂无数据</td>
         </tr>
         <tr v-for="(item, index) in list" :key="item.id">
           <td data-label="序号">{{ (pagination.page - 1) * pagination.limit + index + 1 }}</td>
@@ -55,6 +56,10 @@
           <td data-label="联系电话">{{ item.phone || '-' }}</td>
           <td data-label="地址" class="info-cell">{{ item.address || '-' }}</td>
           <td data-label="预约内容" class="info-cell">{{ item.info || '-' }}</td>
+          <td data-label="操作">
+            <button class="btn btn-sm btn-edit" @click="editItem(item)" title="编辑">编辑</button>
+            <button class="btn btn-sm btn-delete" @click="deleteItem(item.id)" title="删除">删除</button>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -71,12 +76,44 @@
         <option :value="50">50条/页</option>
       </select>
     </div>
+
+    <!-- Edit Dialog -->
+    <div v-if="showEditDialog" class="modal-overlay" @click="closeEditDialog">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>编辑预约</h3>
+          <button class="modal-close" @click="closeEditDialog">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>预约内容：</label>
+            <input type="text" v-model="editForm.info" placeholder="请输入预约内容" />
+          </div>
+          <div class="form-group">
+            <label>状态：</label>
+            <select v-model="editForm.status" class="form-control">
+              <option :value="1">申请中</option>
+              <option :value="2">申请通过</option>
+              <option :value="3">不通过</option>
+              <option :value="4">已完成</option>
+              <option :value="5">已取消</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeEditDialog">取消</button>
+          <button class="btn btn-primary" @click="saveEdit">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import * as echarts from 'echarts';
 import http from '../../api/http';
+import { showMessage, showConfirm } from '../../utils/message';
 
 interface Apply {
   id: string;
@@ -97,6 +134,15 @@ interface Apply {
 const list = ref<Apply[]>([]);
 const loading = ref(false);
 const searchInfo = ref('');
+const chartLoading = ref(false);
+const chartRef = ref<HTMLElement | null>(null);
+const showEditDialog = ref(false);
+const editForm = reactive({
+  id: '',
+  info: '',
+  status: 1
+});
+let chartInstance: echarts.ECharts | null = null;
 
 const pagination = reactive({
   page: 1,
@@ -128,7 +174,6 @@ function getStatusClass(status: number) {
   }
 }
 
-// 格式化日期时间
 function formatDateTime(dateStr: string) {
   if (!dateStr) return '-';
   try {
@@ -142,7 +187,6 @@ function formatDateTime(dateStr: string) {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
     
-    // 如果是创建时间，显示完整时间；如果是预约时间，只显示日期和时间段
     if (dateStr.includes('00:00:00') || dateStr.split(' ').length === 1) {
       return `${year}-${month}-${day}`;
     }
@@ -155,8 +199,7 @@ function formatDateTime(dateStr: string) {
 async function fetchData() {
   loading.value = true;
   try {
-    // 使用getAllByLimitDoctor接口获取所有预约记录（管理员可以看到所有数据）
-    const resp = await http.get('/user/apply/getAllByLimitDoctor', {
+    const resp = await http.get('/user/apply/getAllByLimitAdmin', {
       params: {
         info: searchInfo.value,
         page: pagination.page,
@@ -165,7 +208,6 @@ async function fetchData() {
     });
     const data = resp.data;
     const rows = (data.rows || []) as Apply[];
-    // 按申请时间从新到旧排序（最新的在前面）
     rows.sort((a, b) => {
       const ta = new Date(a.appTime || 0).getTime();
       const tb = new Date(b.appTime || 0).getTime();
@@ -180,6 +222,130 @@ async function fetchData() {
   }
 }
 
+async function fetchChartData() {
+  chartLoading.value = true;
+  try {
+    const resp = await http.get('/user/apply/getAllByLimitAdmin', {
+      params: { page: 1, limit: 10000 }
+    });
+    const rows = resp.data.rows || [];
+    
+    let a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0;
+    rows.forEach((item: any) => {
+      switch (item.status) {
+        case 1: a1++; break;
+        case 2: a2++; break;
+        case 3: a3++; break;
+        case 4: a4++; break;
+        case 5: a5++; break;
+      }
+    });
+    
+    renderChart(a1, a2, a3, a4, a5);
+  } catch (e) {
+    console.error('获取统计数据失败:', e);
+  } finally {
+    chartLoading.value = false;
+  }
+}
+
+function renderChart(a1: number, a2: number, a3: number, a4: number, a5: number) {
+  if (!chartRef.value) return;
+  
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value);
+  }
+
+  const option: echarts.EChartsOption = {
+    title: {
+      text: '预约状态数量统计',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{a} <br/>{b} : {c} ({d}%)'
+    },
+    legend: {
+      orient: 'vertical',
+      left: 'left',
+      data: ['申请中', '申请通过', '不通过', '已完成', '已取消']
+    },
+    series: [
+      {
+        name: '预约状态',
+        type: 'pie',
+        radius: '55%',
+        center: ['50%', '60%'],
+        data: [
+          { value: a1, name: '申请中' },
+          { value: a2, name: '申请通过' },
+          { value: a3, name: '不通过' },
+          { value: a4, name: '已完成' },
+          { value: a5, name: '已取消' }
+        ],
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        }
+      }
+    ]
+  };
+  
+  chartInstance.setOption(option);
+}
+
+function editItem(item: Apply) {
+  editForm.id = item.id;
+  editForm.info = item.info;
+  editForm.status = item.status;
+  showEditDialog.value = true;
+}
+
+function closeEditDialog() {
+  showEditDialog.value = false;
+}
+
+async function saveEdit() {
+  try {
+    const resp = await http.post('/user/apply/chStatus', editForm);
+    if (resp.data === 'SUCCESS' || resp.data === 'jz') {
+      showMessage('保存成功', 'success');
+      closeEditDialog();
+      fetchData();
+      fetchChartData();
+    } else {
+      showMessage('保存失败：' + resp.data, 'error');
+    }
+  } catch (e) {
+    console.error('保存失败:', e);
+    showMessage('保存失败', 'error');
+  }
+}
+
+async function deleteItem(id: string) {
+  const confirmed = await showConfirm('确定要删除这个预约吗？');
+  if (!confirmed) return;
+  
+  try {
+    const resp = await http.get('/user/apply/del', {
+      params: { id }
+    });
+    if (resp.data === 'SUCCESS') {
+      showMessage('删除成功', 'success');
+      fetchData();
+      fetchChartData();
+    } else {
+      showMessage('删除失败：' + resp.data, 'error');
+    }
+  } catch (e) {
+    console.error('删除失败:', e);
+    showMessage('删除失败', 'error');
+  }
+}
+
 function search() {
   pagination.page = 1;
   fetchData();
@@ -190,8 +356,19 @@ function changePage(page: number) {
   fetchData();
 }
 
+function handleResize() {
+  chartInstance?.resize();
+}
+
 onMounted(() => {
   fetchData();
+  fetchChartData();
+  window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+  chartInstance?.dispose();
 });
 </script>
 
@@ -231,6 +408,39 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 14px;
   min-width: 200px;
+}
+
+.chart-card {
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f9f8;
+  margin-bottom: 12px;
+}
+
+.chart-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.chart-tip {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.chart-container {
+  position: relative;
+}
+
+.chart {
+  width: 100%;
+  height: 400px;
 }
 
 .data-table {
@@ -354,11 +564,131 @@ onMounted(() => {
   background: #5aa9a3;
 }
 
+.btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  margin-right: 5px;
+}
+
+.btn-edit {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #2563eb;
+}
+
+.btn-delete {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #dc2626;
+}
+
 .form-control {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #555;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
 }
 
 @media (max-width: 768px) {
@@ -382,6 +712,10 @@ onMounted(() => {
 
   .info-cell {
     max-width: 150px;
+  }
+
+  .chart {
+    height: 300px;
   }
 }
 </style>

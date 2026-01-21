@@ -332,9 +332,8 @@
   
       if (newSchedules.length > 0) {
         try {
-          const resp = await axios.post(`/doctor/schedule/applyTemplate?doctorId=${doctorId}`, newSchedules, {
-            headers: { 'Content-Type': 'application/json' },
-            withCredentials: true, timeout: 10000
+          const resp = await http.post(`/doctor/schedule/applyTemplate?doctorId=${doctorId}`, newSchedules, {
+            headers: { 'Content-Type': 'application/json' }
           });
           
           if (resp.data === 'SUCCESS') {

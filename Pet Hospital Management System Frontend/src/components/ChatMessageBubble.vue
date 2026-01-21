@@ -435,12 +435,13 @@ function handleImageError(event: Event) {
     width: 32px;
     height: 32px;
     margin: 0 6px;
-    border: 1px solid;
-    border-image: conic-gradient(from 0deg at 50% 50%, rgba(0, 0, 0, 1) 23%, rgba(255, 255, 255, 1) 100%) 1;
-    box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.15);
   }
   
   .message-avatar img {
+    border-radius: 50%;
+  }
+  
+  .avatar-placeholder {
     border-radius: 50%;
   }
 
