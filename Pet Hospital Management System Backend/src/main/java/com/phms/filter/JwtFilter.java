@@ -226,6 +226,7 @@ public class JwtFilter extends BasicHttpAuthenticationFilter {
         if (requestURI.equals("/login") || requestURI.equals("/captcha") ||
             requestURI.equals("/sendEmailCode") || requestURI.equals("/doRegist") ||
             requestURI.equals("/resetPassword") || requestURI.equals("/sendResetPasswordCode") ||
+            requestURI.equals("/testEmail") || requestURI.equals("/getEmailCode") ||
             requestURI.equals("/logout") || requestURI.equals("/regist") ||
             requestURI.startsWith("/open/") || requestURI.equals("/index") || 
             requestURI.equals("/home")) {

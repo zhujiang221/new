@@ -192,4 +192,18 @@ coverage/
 
 # 编译文件
 *.class
-*.md
+
+# ============================================
+# 论文文档和敏感文件
+# ============================================
+# 排除论文文档目录
+论文文档/
+
+# 排除论文相关文件
+基于 SpringBoot+Vue 的宠物医院管理系统的设计与实现.doc
+数据库设计.md
+论文专用sql.txt
+
+# 排除QQ邮箱相关配置文档（包含敏感信息）
+Pet Hospital Management System Backend/QQ邮箱问题排查指南.md
+Pet Hospital Management System Backend/QQ邮箱配置说明.md

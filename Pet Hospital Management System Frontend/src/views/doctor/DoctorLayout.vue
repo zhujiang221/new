@@ -388,7 +388,7 @@ const menuItems: MenuItem[] = [
   { label: '排班管理', path: '/doctor/schedule', icon: '⏰' },
   { label: '药品管理', path: '/doctor/medicine', icon: '💊' },
   { label: '开药记录', path: '/doctor/medicine-record', icon: '📝' },
-  { label: '消息中心', path: '/doctor/message', icon: '💬' },
+  { label: '消息中心', path: '/doctor/message', icon: '🔔' },
   { label: '更多设置', path: '/doctor/more', icon: '⚙️' }
 ];
 

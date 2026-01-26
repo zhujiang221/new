@@ -97,36 +97,35 @@
             <div class="triangle"></div>
           </div>
         </el-form-item>
-        <el-space direction="vertical" :size="15" :style="{ width: '100%', display: 'flex', alignItems: 'center', flexDirection: 'column' }">
+        <div class="button-group">
           <el-button
             type="primary"
             native-type="submit"
             class="btn-login"
             :disabled="loading"
-            :style="{ width: '150px' }"
             size="large"
             @click="handleSubmit"
           >
             {{ loading ? '登录中...' : '登录' }}
           </el-button>
-          <el-button
-            type="default"
-            class="btn-register"
-            @click="goRegister"
-            :style="{ width: 'auto' }"
-            size="large"
-          >
-            注册
-          </el-button>
-          <el-button
-            link
-            class="btn-forget-password"
-            @click="goForgetPassword"
-            :style="{ color: '#67c23a', padding: 0 }"
-          >
-            找回密码
-          </el-button>
-        </el-space>
+          <div class="action-links">
+            <el-button
+              type="default"
+              class="btn-register"
+              @click="goRegister"
+              size="default"
+            >
+              注册
+            </el-button>
+            <el-button
+              link
+              class="btn-forget-password"
+              @click="goForgetPassword"
+            >
+              找回密码
+            </el-button>
+          </div>
+        </div>
       </el-form>
     </div>
   </div>
@@ -773,59 +772,96 @@ function goForgetPassword() {
 
 .login-box {
   position: relative;
-  width: 336px;
+  width: 420px;
   max-width: 90vw;
-  background-color: #3c3f41;
-  box-shadow: 0px 0px 43px -2px wheat;
-  border-radius: 8px;
-  padding: 30px;
+  background: rgba(60, 63, 65, 0.95);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+              0 0 0 1px rgba(255, 255, 255, 0.1),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 40px 35px;
   color: white;
-  opacity: 0.95;
   z-index: 1;
-  margin-left: 320px;
-  margin-right: 320px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  animation: slideInUp 0.6s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 移动端登录框样式 */
 @media (max-width: 767px) {
   .login-box {
     width: 90vw;
-    padding: 25px 20px;
+    padding: 30px 25px;
+    border-radius: 12px;
+  }
+  
+  .user-image {
+    margin-bottom: 25px;
   }
   
   .user-image img {
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
   }
   
   .system-title {
-    font-size: 16px;
-    margin-top: 6px;
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+  
+  .login-form {
+    max-width: 100%;
   }
   
   .login-form :deep(.el-form-item) {
-    margin-bottom: 20px;
+    margin-bottom: 22px;
   }
   
-  .input-field {
-    padding: 12px 10px;
+  .input-field :deep(.el-input__wrapper) {
+    height: 48px;
+  }
+  
+  .input-field :deep(.el-input__inner) {
     font-size: 16px; /* 防止iOS自动缩放 */
   }
   
   .captcha-wrapper {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
   
   .captcha-image-wrapper {
     width: 100%;
-    height: 45px;
+    height: 48px;
+  }
+  
+  .btn-login {
+    height: 50px;
+    font-size: 17px;
+  }
+  
+  .action-links {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .btn-register {
+    width: 100%;
   }
 }
 
@@ -833,37 +869,60 @@ function goForgetPassword() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 10px auto;
+  margin: 0 auto 30px;
+  animation: fadeInDown 0.8s ease-out 0.2s both;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .user-image img {
-  width: 100px;
-  height: 100px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   object-fit: cover;
-  border-style: none;
-  border-width: 0px;
-  border-color: rgba(0, 0, 0, 0);
-  border-image: none;
-  margin-bottom: 10px;
+  border: 3px solid rgba(103, 194, 58, 0.3);
+  margin-bottom: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2),
+              0 0 0 4px rgba(103, 194, 58, 0.1);
+  transition: all 0.3s ease;
+}
+
+.user-image img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3),
+              0 0 0 4px rgba(103, 194, 58, 0.2);
 }
 
 .system-title {
   color: white;
-  font-size: 18px;
-  font-weight: 500;
+  font-size: 20px;
+  font-weight: 600;
   text-align: center;
-  margin-top: 8px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  letter-spacing: 1px;
+  margin-top: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #ffffff 0%, #a8e063 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .login-form {
-  width: 250px;
+  width: 100%;
+  max-width: 350px;
 }
 
 .login-form :deep(.el-form-item) {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .login-form :deep(.el-form-item__label) {
@@ -896,23 +955,25 @@ function goForgetPassword() {
 }
 
 .input-field :deep(.el-input__wrapper) {
-  border-radius: 6px;
-  border: 1px solid #dcdfe6;
-  box-shadow: none;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.95);
   width: 100% !important;
   box-sizing: border-box;
+  height: 44px;
 }
 
 .input-field :deep(.el-input__wrapper:hover) {
   border-color: #67c23a;
+  box-shadow: 0 2px 8px rgba(103, 194, 58, 0.15);
 }
 
 .input-field :deep(.el-input__wrapper.is-focus) {
   border-color: #67c23a;
-  box-shadow: 0 0 0 2px rgba(103, 194, 58, 0.1);
-  width: 50px;
+  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.15);
+  background-color: #fff;
 }
 
 .input-field.warning :deep(.el-input__wrapper) {
@@ -975,56 +1036,104 @@ function goForgetPassword() {
   top: -6px;
 }
 
+.button-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-top: 10px;
+}
+
 .btn-login {
-  border-radius: 6px;
-  background-color: #67c23a;
+  width: 100%;
+  height: 48px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
   color: white;
   border: none;
   font-size: 16px;
-  font-weight: 500;
-  transition: all 0.3s;
-  box-shadow: 0 2px 4px rgba(103, 194, 58, 0.2);
-  font-family: "Noto Sans SC";
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  letter-spacing: 1px;
+  position: relative;
   overflow: hidden;
 }
 
+.btn-login::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-login:hover::before {
+  left: 100%;
+}
+
 .btn-login:hover {
-  background-color: #5daf34;
-  box-shadow: 0 4px 8px rgba(103, 194, 58, 0.3);
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #5daf34 0%, #73c04d 100%);
+  box-shadow: 0 6px 20px rgba(103, 194, 58, 0.4);
+  transform: translateY(-2px);
 }
 
 .btn-login:active {
   transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(103, 194, 58, 0.3);
 }
 
 .btn-login:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+}
+
+.action-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
 }
 
 .btn-register {
   border-radius: 6px;
-  background-color: #85ce61;
-  color: white;
-  border: none;
-  font-size: 16px;
+  background-color: rgba(133, 206, 97, 0.15);
+  color: #85ce61;
+  border: 1px solid rgba(133, 206, 97, 0.3);
+  font-size: 14px;
   font-weight: 500;
   transition: all 0.3s;
-  box-shadow: 0 2px 4px rgba(133, 206, 97, 0.2);
-  padding-left: 60px;
-  padding-right: 60px;
+  padding: 8px 24px;
 }
 
 .btn-register:hover {
-  background-color: #73c04d;
-  box-shadow: 0 4px 8px rgba(133, 206, 97, 0.3);
+  background-color: rgba(133, 206, 97, 0.25);
+  border-color: rgba(133, 206, 97, 0.5);
+  color: #a8e063;
   transform: translateY(-1px);
 }
 
 .btn-register:active {
   transform: translateY(0);
+}
+
+.btn-forget-password {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px;
+  padding: 8px 12px;
+  transition: all 0.3s;
+}
+
+.btn-forget-password:hover {
+  color: #67c23a !important;
 }
 
 .captcha-wrapper {

@@ -431,7 +431,8 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public void save(User user) {
-		userMapper.insert(user);
+		// 使用insertSelective，只插入非null字段，避免注册时因null值导致失败
+		userMapper.insertSelective(user);
 	}
 
 	@Override

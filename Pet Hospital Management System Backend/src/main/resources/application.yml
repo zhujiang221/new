@@ -63,18 +63,26 @@ spring:
   jackson:
     date-format: yyyy/MM/dd HH:mm:ss
 
-  # 邮件配置
+  # 邮件配置（注意：实际配置在application.properties中，此处仅作参考）
+  # 如需修改邮件配置，请修改application.properties文件
+  # 当前使用587端口（STARTTLS），如果失败可以尝试465端口（SSL）
   mail:
     host: smtp.qq.com
     port: 587
     username: jianglianglovepet@qq.com
-    password: zyihrleyrtlldffb
+    password: zdfcjbjvikckdfab
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+            required: true
+          ssl:
+            enable: false
+          connectiontimeout: 30000
+          timeout: 30000
+          writetimeout: 30000
     default-encoding: UTF-8
 
   # Redis配置

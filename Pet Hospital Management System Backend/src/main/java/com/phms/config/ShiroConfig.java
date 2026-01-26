@@ -111,6 +111,8 @@ public class ShiroConfig {
 		filterChainDefinitionMap.put("/doRegist", "anon");
 		filterChainDefinitionMap.put("/resetPassword", "anon");
 		filterChainDefinitionMap.put("/sendResetPasswordCode", "anon");
+		filterChainDefinitionMap.put("/testEmail", "anon");
+		filterChainDefinitionMap.put("/getEmailCode", "anon");
 		filterChainDefinitionMap.put("/index", "anon");
 		filterChainDefinitionMap.put("/home", "anon");
 		filterChainDefinitionMap.put("/open/**", "anon");

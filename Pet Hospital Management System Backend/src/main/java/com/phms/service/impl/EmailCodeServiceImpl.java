@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -63,21 +64,32 @@ public class EmailCodeServiceImpl implements EmailCodeService {
                 return false;
             }
             
-            // 发送邮件
-            boolean sendSuccess = emailUtil.sendVerificationCode(email, code);
-            if (!sendSuccess) {
-                logger.error("验证码邮件发送失败: email={}", email);
-                return false;
-            }
-            
-            // 存储验证码到Redis，设置30分钟过期
+            // 先存储验证码到Redis，设置30分钟过期（即使邮件发送失败，验证码也已保存）
             String codeKey = CODE_KEY_PREFIX + email;
             stringRedisTemplate.opsForValue().set(codeKey, code, CODE_EXPIRE_TIME, TimeUnit.SECONDS);
             
             // 存储发送时间到Redis，设置60秒过期（用于限制发送频率）
             stringRedisTemplate.opsForValue().set(sendTimeKey, String.valueOf(currentTime), SEND_INTERVAL, TimeUnit.SECONDS);
             
-            logger.info("验证码发送成功: email={}, code={}", email, code);
+            // 异步发送邮件，避免阻塞请求
+            final String finalEmail = email;
+            final String finalCode = code;
+            CompletableFuture.runAsync(() -> {
+                try {
+                    boolean sendSuccess = emailUtil.sendVerificationCode(finalEmail, finalCode);
+                    if (sendSuccess) {
+                        logger.info("验证码邮件发送成功: email={}", finalEmail);
+                    } else {
+                        logger.warn("验证码邮件发送失败，但验证码已保存到Redis: email={}, code={}", finalEmail, finalCode);
+                        logger.warn("提示：请检查QQ邮箱授权码是否正确，或查看QQ邮箱配置说明.md");
+                    }
+                } catch (Exception e) {
+                    logger.error("异步发送验证码邮件异常: email={}, 但验证码已保存到Redis: code={}", finalEmail, finalCode, e);
+                    logger.error("提示：请检查QQ邮箱授权码是否正确，或查看QQ邮箱配置说明.md");
+                }
+            });
+            
+            logger.info("验证码已生成并保存到Redis: email={}, code={}", email, code);
             return true;
         } catch (Exception e) {
             logger.error("发送验证码异常: email={}", email, e);

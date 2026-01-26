@@ -55,6 +55,8 @@ public class ChatSession extends BaseBean {
     // 最后一条消息内容
     private String lastMessageContent;
     private String lastMessageType;
+    private Integer lastMessageIsRevoked; // 最后一条消息是否撤回 0=未撤回, 1=已撤回
+    private Long lastMessageSenderId; // 最后一条消息的发送者ID
 
     public Long getId() {
         return id;
@@ -166,5 +168,21 @@ public class ChatSession extends BaseBean {
 
     public void setLastMessageType(String lastMessageType) {
         this.lastMessageType = lastMessageType;
+    }
+
+    public Integer getLastMessageIsRevoked() {
+        return lastMessageIsRevoked;
+    }
+
+    public void setLastMessageIsRevoked(Integer lastMessageIsRevoked) {
+        this.lastMessageIsRevoked = lastMessageIsRevoked;
+    }
+
+    public Long getLastMessageSenderId() {
+        return lastMessageSenderId;
+    }
+
+    public void setLastMessageSenderId(Long lastMessageSenderId) {
+        this.lastMessageSenderId = lastMessageSenderId;
     }
 }

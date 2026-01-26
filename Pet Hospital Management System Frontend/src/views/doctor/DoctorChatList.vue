@@ -219,6 +219,20 @@ async function fetchSessions() {
 }
 
 function getPreviewText(session: ChatSession): string {
+  // 检查消息是否被撤回（兼容多种可能的字段名）
+  const lastMessageIsRevoked = (session as any).lastMessageIsRevoked ?? 
+                                (session as any).last_message_is_revoked ?? 
+                                0;
+  const isRevoked = lastMessageIsRevoked === 1 || lastMessageIsRevoked === true;
+  
+  if (isRevoked) {
+    const userInfo = getUserInfo();
+    const senderId = (session as any).lastMessageSenderId ?? 
+                     (session as any).last_message_sender_id;
+    const isMyMessage = userInfo && senderId && Number(senderId) === Number(userInfo.id);
+    return isMyMessage ? '你撤回了一条消息' : '对方撤回了一条消息';
+  }
+  
   if (session.lastMessageContent) {
     if (session.lastMessageType === 'text') {
       return session.lastMessageContent.length > 30

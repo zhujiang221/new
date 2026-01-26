@@ -12,7 +12,6 @@
         <button class="back-btn" @click="goToList">←</button>
         <div class="chat-title">
           <div class="title-name">{{ currentSession?.doctorName || '医生' }}</div>
-          <div class="title-status">在线</div>
         </div>
       </div>
 

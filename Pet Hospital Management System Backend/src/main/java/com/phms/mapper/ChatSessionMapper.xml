@@ -16,6 +16,8 @@
     <result column="unread_count" jdbcType="INTEGER" property="unreadCount" />
     <result column="last_message_content" jdbcType="VARCHAR" property="lastMessageContent" />
     <result column="last_message_type" jdbcType="VARCHAR" property="lastMessageType" />
+    <result column="last_message_is_revoked" jdbcType="TINYINT" property="lastMessageIsRevoked" />
+    <result column="last_message_sender_id" jdbcType="BIGINT" property="lastMessageSenderId" />
   </resultMap>
 
   <sql id="Base_Column_List">
@@ -87,7 +89,9 @@
     d.name as doctor_name, d.img as doctor_img,
     (select count(*) from chat_message cm where cm.session_id = cs.id and cm.receiver_id = #{userId} and cm.is_read = 0) as unread_count,
     (select cm.content from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_content,
-    (select cm.message_type from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_type
+    (select cm.message_type from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_type,
+    (select cm.is_revoked from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_is_revoked,
+    (select cm.sender_id from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_sender_id
     from chat_session cs
     left join user u on cs.user_id = u.id
     left join user d on cs.doctor_id = d.id
@@ -103,7 +107,9 @@
     d.name as doctor_name, d.img as doctor_img,
     (select count(*) from chat_message cm where cm.session_id = cs.id and cm.receiver_id = #{doctorId} and cm.is_read = 0) as unread_count,
     (select cm.content from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_content,
-    (select cm.message_type from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_type
+    (select cm.message_type from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_type,
+    (select cm.is_revoked from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_is_revoked,
+    (select cm.sender_id from chat_message cm where cm.session_id = cs.id order by cm.create_time desc limit 1) as last_message_sender_id
     from chat_session cs
     left join user u on cs.user_id = u.id
     left join user d on cs.doctor_id = d.id

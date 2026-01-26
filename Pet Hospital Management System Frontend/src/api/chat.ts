@@ -33,6 +33,8 @@ export interface ChatSession {
   unreadCount?: number;
   lastMessageContent?: string;
   lastMessageType?: string;
+  lastMessageIsRevoked?: number; // 0=未撤回, 1=已撤回
+  lastMessageSenderId?: number; // 最后一条消息的发送者ID
 }
 
 export interface ChatMessage {

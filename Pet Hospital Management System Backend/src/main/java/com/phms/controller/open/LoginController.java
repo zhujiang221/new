@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -45,6 +47,8 @@ public class LoginController {
 	private StringRedisTemplate stringRedisTemplate;
 	@Autowired
 	private JwtUtil jwtUtil;
+	@Autowired(required = false)
+	private JavaMailSender mailSender;
 
 	private final Logger logger = LoggerFactory.getLogger(LoginController.class);
 	
@@ -376,7 +380,7 @@ public class LoginController {
 			user.setCreateTime(new Date());
 			user.setRole(3); // 注册时默认设置为普通用户角色（3=用户）
 			
-			// 保存用户
+			// 保存用户（使用insertSelective，只插入非null字段）
 			userService.save(user);
 			
 			// 注册成功后清除验证码
@@ -385,10 +389,32 @@ public class LoginController {
 			logger.info("用户注册成功: username={}, name={}, phone={}, email={}, id={}, role={}", 
 					user.getUsername(), user.getName(), user.getPhone(), user.getEmail(), user.getId(), user.getRole());
 			return resultMap.success().message("注册成功");
+		} catch (org.springframework.dao.DuplicateKeyException e) {
+			// 处理唯一约束冲突（用户名或邮箱重复）
+			logger.error("注册失败: 用户名或邮箱已存在, username={}, email={}", username, email, e);
+			String errorMsg = "注册失败";
+			String exceptionMsg = e.getMessage();
+			if (exceptionMsg != null) {
+				if (exceptionMsg.contains("username") || exceptionMsg.contains("用户名")) {
+					errorMsg = "用户名已被注册";
+				} else if (exceptionMsg.contains("email") || exceptionMsg.contains("邮箱")) {
+					errorMsg = "该邮箱已被注册，请直接登录";
+				}
+			}
+			return resultMap.fail().message(errorMsg);
 		} catch (Exception e) {
 			logger.error("注册失败: username={}, name={}, phone={}, email={}", username, name, phone, email, e);
-			e.printStackTrace();
-			return resultMap.fail().message("注册失败: " + (e.getMessage() != null ? e.getMessage() : "系统异常"));
+			// 记录详细的异常信息
+			String errorMsg = "注册失败";
+			String exceptionMsg = e.getMessage();
+			if (exceptionMsg != null) {
+				errorMsg = "注册失败: " + exceptionMsg;
+				// 如果是数据库相关错误，提供更友好的提示
+				if (exceptionMsg.contains("SQL") || exceptionMsg.contains("database")) {
+					errorMsg = "注册失败，请检查输入信息是否正确";
+				}
+			}
+			return resultMap.fail().message(errorMsg);
 		}
 	}
 
@@ -588,6 +614,85 @@ public class LoginController {
 			logger.error("重置密码异常: email={}", email, e);
 			e.printStackTrace();
 			return resultMap.fail().message("密码重置失败: " + (e.getMessage() != null ? e.getMessage() : "系统异常"));
+		}
+	}
+
+	/**
+	 * 测试邮件配置（仅用于开发调试）
+	 * 注意：生产环境应禁用此接口
+	 */
+	@RequestMapping(value = "/testEmail", method = RequestMethod.POST)
+	@ResponseBody
+	public ResultMap testEmail(String testEmail) {
+		logger.info("测试邮件配置: testEmail={}", testEmail);
+		
+		if (testEmail == null || testEmail.trim().isEmpty()) {
+			return resultMap.fail().message("测试邮箱不能为空");
+		}
+		
+		String emailPattern = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
+		if (!testEmail.trim().matches(emailPattern)) {
+			return resultMap.fail().message("邮箱格式不正确");
+		}
+		
+		if (mailSender == null) {
+			return resultMap.fail().message("邮件服务未配置");
+		}
+		
+		try {
+			// 发送测试邮件
+			SimpleMailMessage message = new SimpleMailMessage();
+			message.setFrom("jianglianglovepet@qq.com");
+			message.setTo(testEmail.trim());
+			message.setSubject("宠物医院管理系统 - 邮件配置测试");
+			message.setText("这是一封测试邮件。如果您收到此邮件，说明邮件配置正确。\n\n发送时间：" + new Date());
+			
+			mailSender.send(message);
+			
+			logger.info("测试邮件发送成功: to={}", testEmail);
+			return resultMap.success().message("测试邮件发送成功，请检查邮箱收件箱");
+		} catch (org.springframework.mail.MailAuthenticationException e) {
+			logger.error("邮件认证失败: {}", e.getMessage());
+			String errorMsg = "邮件认证失败！\n\n";
+			errorMsg += "请立即检查：\n";
+			errorMsg += "1. 登录 https://mail.qq.com\n";
+			errorMsg += "2. 设置 → 账户 → 开启 'POP3/SMTP服务' 和 'IMAP/SMTP服务'\n";
+			errorMsg += "3. 重新生成授权码并更新配置\n";
+			errorMsg += "4. 等待10分钟后再试（避免频率限制）\n\n";
+			errorMsg += "错误详情：" + e.getMessage();
+			return resultMap.fail().message(errorMsg);
+		} catch (Exception e) {
+			logger.error("测试邮件发送失败: {}", e.getMessage(), e);
+			return resultMap.fail().message("测试邮件发送失败: " + e.getMessage());
+		}
+	}
+	
+	/**
+	 * 获取当前验证码（仅用于开发调试，邮件发送失败时临时使用）
+	 * 注意：生产环境应禁用此接口
+	 */
+	@RequestMapping(value = "/getEmailCode", method = RequestMethod.POST)
+	@ResponseBody
+	public ResultMap getEmailCode(String email) {
+		logger.info("获取验证码请求: email={}", email);
+		
+		if (email == null || email.trim().isEmpty()) {
+			return resultMap.fail().message("邮箱不能为空");
+		}
+		
+		try {
+			String codeKey = "email_code:" + email.trim();
+			String code = stringRedisTemplate.opsForValue().get(codeKey);
+			
+			if (code == null) {
+				return resultMap.fail().message("验证码不存在或已过期");
+			}
+			
+			logger.warn("开发模式：返回验证码给用户，email={}, code={}", email, code);
+			return resultMap.success().message("验证码：" + code);
+		} catch (Exception e) {
+			logger.error("获取验证码失败: {}", e.getMessage(), e);
+			return resultMap.fail().message("获取验证码失败: " + e.getMessage());
 		}
 	}
 }
